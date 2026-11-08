@@ -8,49 +8,74 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
+<link rel="stylesheet" href="lib/maplibre-gl.css">
 <style>
-:root{--bg:#0b0f14;--panel:#141b23;--line:#243040;--tx:#e8eef5;--mut:#8696a8;--ok:#2ecc71;--warn:#f5b041;--bad:#ff4d4d;--acc:#4da3ff}
+:root{--bg:#0b0f14;--panel:#141b23ee;--line:#243040;--tx:#e8eef5;--mut:#8696a8;--ok:#2ecc71;--warn:#f5b041;--bad:#ff4d4d;--acc:#4da3ff;
+  --st:env(safe-area-inset-top);--sb:env(safe-area-inset-bottom)}
 *{box-sizing:border-box;margin:0}
-html,body{height:100%}
-body{background:var(--bg);color:var(--tx);font:16px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-  display:flex;flex-direction:column;-webkit-tap-highlight-color:transparent}
-header{display:flex;align-items:center;gap:8px;padding:10px 14px}
-header h1{font-size:15px;font-weight:600;letter-spacing:.02em;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.chip{font-size:12px;color:var(--mut);border:1px solid var(--line);border-radius:99px;padding:3px 9px;white-space:nowrap}
-.chip.ok{color:var(--ok);border-color:#1f5f3a}.chip.bad{color:var(--bad);border-color:#6b2424}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--tx);font:16px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+#map{position:fixed;inset:0;background:#10151c}
 button{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;cursor:pointer}
-button:active{transform:scale(.98)}
-.icon{padding:8px 10px;border-radius:10px}
-main{flex:1;display:flex;flex-direction:column;gap:12px;padding:4px 14px 12px;overflow:auto}
-.speed{text-align:center;padding:6px 0 0}
-.speed b{display:block;font-size:min(34vw,170px);font-weight:700;line-height:.95;font-variant-numeric:tabular-nums;letter-spacing:-.04em}
-.speed span{color:var(--mut);font-size:14px}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px}
-.card h2{font-size:13px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
-.sec-name{font-size:18px;font-weight:600;display:flex;align-items:center;gap:10px}
-.sec-name small{display:block;font-size:13px;color:var(--mut);font-weight:400}
-.limit{margin-left:auto;flex:none;width:52px;height:52px;border-radius:50%;border:5px solid #d62828;background:#fff;color:#111;
-  display:grid;place-items:center;font-weight:800;font-size:19px}
-.bar{height:8px;border-radius:9px;background:#0d131a;margin:12px 0;overflow:hidden}
+button:active{transform:scale(.97)}
+/* горен банер */
+.top{position:fixed;left:10px;right:10px;max-width:520px;top:calc(var(--st) + 10px);z-index:3;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.top>*{pointer-events:auto}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 14px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.card h2{font-size:12px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+#idle{padding:9px 14px;font-size:14px}
+.sec-name{font-size:16px;font-weight:600;display:flex;align-items:center;gap:10px}
+.sec-name small{display:block;font-size:12px;color:var(--mut);font-weight:400}
+.limit{margin-left:auto;flex:none;width:46px;height:46px;border-radius:50%;border:5px solid #d62828;background:#fff;color:#111;display:grid;place-items:center;font-weight:800;font-size:17px}
+.bar{height:6px;border-radius:9px;background:#0d131a;margin:8px 0;overflow:hidden}
 .bar i{display:block;height:100%;width:0;background:var(--acc);transition:width .5s}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.cell{background:#0f151c;border-radius:12px;padding:10px}
-.cell span{display:block;font-size:12px;color:var(--mut)}
-.cell b{font-size:28px;font-variant-numeric:tabular-nums}
-.cell.big{grid-column:1/-1;text-align:center}
-.cell.big b{font-size:56px;line-height:1}
+.grid{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:8px}
+.cell{background:#0f151ccc;border-radius:10px;padding:6px 8px}
+.cell span{display:block;font-size:11px;color:var(--mut)}
+.cell b{font-size:22px;font-variant-numeric:tabular-nums}
+.cell.big b{font-size:34px;line-height:1.05}
 .ok b.v{color:var(--ok)}.warn b.v{color:var(--warn)}.over b.v{color:var(--bad)}
-.card.over{border-color:var(--bad);box-shadow:0 0 0 2px #ff4d4d55 inset}
+.card.over{border-color:var(--bad);box-shadow:0 0 0 2px #ff4d4d66 inset}
+.extra{display:flex;gap:14px;font-size:12px;color:var(--mut);margin-top:6px}
+.extra b{color:var(--tx);font-variant-numeric:tabular-nums}
 .mut{color:var(--mut);font-size:14px}
 .result{border-left:4px solid var(--ok)}.result.over{border-left-color:var(--bad)}
-footer{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px 14px 14px}
-footer button{padding:16px;font-weight:600;font-size:17px}
-#go.on{background:#3a1414;border-color:#6b2424}
-#go:not(.on){background:#123a24;border-color:#1f5f3a}
+/* скорост като в навигация */
+.spdw{position:fixed;left:12px;bottom:calc(var(--sb) + 86px);z-index:3;display:flex;align-items:flex-end;gap:8px}
+.spd{width:92px;height:92px;border-radius:50%;background:#fff;color:#111;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  box-shadow:0 4px 18px #0008;border:4px solid #fff;transition:background .3s,color .3s}
+.spd b{font-size:38px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+.spd span{font-size:11px;color:#555}
+.spd.over{background:var(--bad);border-color:#fff;color:#fff}.spd.over span{color:#fff}
+/* дясна колона */
+.side{position:fixed;right:10px;bottom:calc(var(--sb) + 86px);z-index:3;display:flex;flex-direction:column;gap:8px}
+.side button{width:50px;height:50px;padding:0;border-radius:50%;font-size:20px;display:grid;place-items:center;background:var(--panel)}
+#center.off{color:var(--acc);border-color:var(--acc)}
+/* долна лента */
+.bottom{position:fixed;left:10px;right:10px;bottom:calc(var(--sb) + 10px);z-index:3;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.bottom button{padding:15px;font-weight:600;font-size:16px}
+#go.on{background:#3a1414ee;border-color:#6b2424}
+#go:not(.on){background:#123a24ee;border-color:#1f5f3a}
+.chips{position:fixed;right:10px;bottom:calc(var(--sb) + 256px);z-index:3;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.chip{font-size:11px;color:var(--mut);background:var(--panel);border:1px solid var(--line);border-radius:99px;padding:2px 8px;white-space:nowrap}
+.chip.ok{color:var(--ok);border-color:#1f5f3a}.chip.bad{color:var(--bad);border-color:#6b2424}
+/* MapLibre */
+.maplibregl-ctrl-group{background:var(--panel)!important;border:1px solid var(--line);border-radius:12px!important}
+.maplibregl-ctrl-group button{width:40px;height:40px}
+.maplibregl-ctrl-group button+button{border-top:1px solid var(--line)!important}
+.maplibregl-ctrl-icon{filter:invert(1)}
+.maplibregl-ctrl-top-right{top:auto!important;bottom:calc(var(--sb) + 300px)}
+.maplibregl-ctrl-bottom-right{bottom:calc(var(--sb) + 68px)}
+.maplibregl-ctrl-attrib{background:#000a!important;color:#aaa;font-size:10px}
+.maplibregl-ctrl-attrib a{color:#ccc}
+.maplibregl-popup-content{background:#141b23;color:var(--tx);border-radius:10px;font-size:13px;padding:10px 12px}
+.maplibregl-popup-tip{border-top-color:#141b23!important;border-bottom-color:#141b23!important}
+.maplibregl-popup-close-button{color:#ccc;font-size:18px}
+.car{width:48px;height:48px}
+/* листове */
 .sheet{position:fixed;inset:0;background:#000a;display:none;align-items:flex-end;z-index:5}
 .sheet.show{display:flex}
-.sheet>div{background:var(--panel);width:100%;max-height:88vh;overflow:auto;border-radius:18px 18px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom))}
+.sheet>div{background:#141b23;width:100%;max-height:88vh;overflow:auto;border-radius:18px 18px 0 0;padding:18px 16px calc(18px + var(--sb))}
 .sheet h3{font-size:18px;margin-bottom:12px}
 .row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
 .row select,.row input{font:inherit;background:#0f151c;color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:6px}
@@ -60,53 +85,49 @@ footer button{padding:16px;font-weight:600;font-size:17px}
 .tag.osm{color:var(--acc)}.tag.manual{color:var(--ok)}.tag.u{color:var(--warn)}
 .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .btns button{flex:1;min-width:140px}
-.toast{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:#000d;border:1px solid var(--line);padding:10px 14px;border-radius:10px;font-size:14px;display:none;z-index:9;max-width:90vw;text-align:center}
+.toast{position:fixed;left:50%;bottom:calc(var(--sb) + 190px);transform:translateX(-50%);background:#000d;border:1px solid var(--line);padding:10px 14px;border-radius:10px;font-size:14px;display:none;z-index:9;max-width:90vw;text-align:center}
 .intro p{margin:8px 0;color:var(--mut);font-size:15px}
 .intro p b{color:var(--tx)}
 </style>
 </head>
 <body>
-<header>
-  <h1>Средна скорост</h1>
-  <span class="chip" id="gps">GPS: изкл.</span>
-  <span class="chip" id="osm">…</span>
-  <button class="icon" id="setBtn" aria-label="Настройки">☰</button>
-</header>
+<div id="map"></div>
 
-<main>
-  <div class="speed"><b id="spd">–</b><span>км/ч текуща</span></div>
-
-  <div class="card" id="idle">
-    <h2>Извън отсечка</h2>
-    <div id="nearest" class="mut">Натисни „Старт“, за да започне следенето.</div>
-  </div>
-
+<div class="top">
+  <div class="card" id="idle"><div id="nearest" class="mut">Натисни „Старт“, за да започне следенето.</div></div>
   <div class="card" id="act" hidden>
     <div class="sec-name"><div><small id="aRoad"></small><span id="aName"></span></div><div class="limit" id="aLim">140</div></div>
     <div class="bar"><i id="aBar"></i></div>
     <div class="grid">
-      <div class="cell big" id="aAvgCell"><span>Средна до момента</span><b class="v" id="aAvg">–</b></div>
-      <div class="cell"><span>Карай най-много</span><b id="aRec">–</b></div>
-      <div class="cell"><span>Остават</span><b id="aRem">–</b></div>
-      <div class="cell"><span>При тази скорост</span><b id="aPred">–</b></div>
-      <div class="cell"><span>Време в отсечката</span><b id="aTime">–</b></div>
+      <div class="cell big" id="aAvgCell"><span>Средна</span><b class="v" id="aAvg">–</b></div>
+      <div class="cell"><span>Карай до</span><b id="aRec">–</b></div>
+      <div class="cell"><span>Остават, км</span><b id="aRem">–</b></div>
     </div>
-    <p class="mut" id="aNote" style="margin-top:8px"></p>
+    <div class="extra"><span>При тази скорост: <b id="aPred">–</b></span><span>Време: <b id="aTime">–</b></span></div>
+    <p class="mut" id="aNote" style="margin-top:6px;font-size:12px"></p>
   </div>
-
   <div class="card result" id="res" hidden></div>
-  <p class="mut" style="text-align:center;font-size:12px">Ориентировъчно изчисление по GPS. Официалната средна скорост се отчита от тол рамките.</p>
-</main>
+</div>
 
-<footer>
+<div class="chips"><span class="chip" id="gps">GPS: изкл.</span><span class="chip" id="osm">…</span></div>
+
+<div class="spdw"><div class="spd" id="spdBox"><b id="spd">–</b><span>км/ч</span></div></div>
+
+<div class="side">
+  <button id="center" aria-label="Центрирай">◎</button>
+  <button id="setBtn" aria-label="Настройки">☰</button>
+</div>
+
+<div class="bottom">
   <button id="go">Старт</button>
   <button id="cal">Тук е рамка</button>
-</footer>
+</div>
 
 <div class="sheet" id="sheet"><div>
   <h3>Настройки</h3>
   <div class="row"><span>Резерв под ограничението</span>
     <select id="margin"><option value="0">0 км/ч</option><option value="3">3 км/ч</option><option value="5">5 км/ч</option><option value="10">10 км/ч</option></select></div>
+  <div class="row"><span>Картата по посоката на движение</span><input type="checkbox" id="headUp"></div>
   <div class="row"><span>Гласови съобщения</span><input type="checkbox" id="voice"></div>
   <div class="row"><span>Звуков сигнал при превишаване</span><input type="checkbox" id="beep"></div>
   <div class="btns">
@@ -116,7 +137,7 @@ footer button{padding:16px;font-weight:600;font-size:17px}
     <button id="testVoice">Тест на гласа</button>
   </div>
   <h3 style="margin-top:18px">Отсечки (<span id="cnt"></span>)</h3>
-  <p class="mut">Точност на рамките: <span class="tag">приблизителна</span> по населеното място, <span class="tag osm">OSM</span>, <span class="tag manual">калибрирана</span>. Данни към <span id="upd"></span>.</p>
+  <p class="mut">Точност на рамките: <span class="tag">≈ приблизителна</span> по населеното място, <span class="tag osm">OSM</span>, <span class="tag manual">✓ калибрирана</span>. Данни към <span id="upd"></span>.</p>
   <div class="list" id="list"></div>
   <div class="btns"><button id="closeSet">Затвори</button></div>
 </div></div>
@@ -136,8 +157,10 @@ footer button{padding:16px;font-weight:600;font-size:17px}
 
 <div class="toast" id="toast"></div>
 
+<script src="lib/maplibre-gl.js"></script>
 <script src="data.js"></script>
 <script src="core.js"></script>
 <script src="app.js"></script>
+<script src="map.js"></script>
 </body>
 </html>

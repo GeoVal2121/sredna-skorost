@@ -5,7 +5,7 @@
     get: function (k, d) { try { var v = localStorage.getItem("ss_" + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
     set: function (k, v) { try { localStorage.setItem("ss_" + k, JSON.stringify(v)); } catch (e) { } }
   };
-  var cfg = Object.assign({ margin: 3, voice: true, beep: true }, store.get("cfg", {}));
+  var cfg = Object.assign({ margin: 3, voice: true, beep: true, headUp: true }, store.get("cfg", {}));
   var manual = store.get("manual", {});           // ръчни калибрации
   var osmCache = store.get("osm", null);          // { t, g:[[lat,lon]] }
   var model, tracker, watchId = null, wake = null, demoTimer = null, lastFix = null;
@@ -24,6 +24,7 @@
       SSCore.applyOverrides(model.points, overrides());
     }
     osmChip(); renderList();
+    if (window.SSMap) SSMap.refresh();
   }
 
   // ---------- звук и глас ----------
@@ -91,6 +92,7 @@
     var evs = tracker.feed(fix);
     evs.forEach(onEvent);
     render(fix.t);
+    if (window.SSMap) SSMap.onFix(fix);
     var g = $("gps");
     g.textContent = "GPS ±" + r0(fix.acc || 0) + " м";
     g.className = "chip " + ((fix.acc || 0) <= 30 ? "ok" : (fix.acc || 0) > 100 ? "bad" : "");
@@ -101,7 +103,7 @@
     if (!window.isSecureContext) toast("GPS изисква HTTPS адрес.");
     watchId = navigator.geolocation.watchPosition(function (pos) {
       var c = pos.coords;
-      onFix({ lat: c.latitude, lon: c.longitude, t: pos.timestamp || Date.now(), speed: c.speed, acc: c.accuracy });
+      onFix({ lat: c.latitude, lon: c.longitude, t: pos.timestamp || Date.now(), speed: c.speed, acc: c.accuracy, heading: c.heading });
     }, function (err) {
       var g = $("gps"); g.className = "chip bad";
       g.textContent = err.code === 1 ? "GPS: отказан" : "GPS: няма сигнал";
@@ -170,6 +172,7 @@
     $("spd").textContent = tracker.last ? r0(tracker.speed) : "–";
     var st = tracker.activeState(t);
     $("act").hidden = !st; $("idle").hidden = !!st;
+    $("spdBox").classList.toggle("over", !!st && tracker.speed > st.sec.limit);
     if (st) {
       var s = st.sec;
       $("aRoad").textContent = s.roadName + (s.upcoming ? " · предстояща" : "");
@@ -180,11 +183,11 @@
       $("aAvgCell").className = "cell big " + st.status;
       $("act").className = "card" + (st.status === "over" ? " over" : "");
       $("aRec").textContent = st.rec == null ? "–" : r0(st.rec);
-      $("aRem").textContent = st.remaining.toFixed(1).replace(".", ",") + " км";
+      $("aRem").textContent = st.remaining.toFixed(1).replace(".", ",");
       $("aPred").textContent = r0(st.predicted);
       $("aTime").textContent = fmtMin(st.elapsedMin);
       var pa = model.points[s.fromKey].src, pb = model.points[s.toKey].src;
-      $("aNote").textContent = (pa === "approx" || pb === "approx") ? "Рамките на тази отсечка са с приблизителни координати — началото и краят може да се отчетат с до 1–2 км разлика." : "";
+      $("aNote").textContent = (pa === "approx" || pb === "approx") ? "Приблизителни рамки: началото и краят може да се отчетат с 1–2 км разлика." : "";
     } else {
       var n = tracker.nearest();
       if (tracker.cands.length) $("nearest").textContent = "Мина под рамка — определям посоката…";
@@ -213,6 +216,7 @@
   function demo() {
     stop(); unlockAudio(); keepAwake();
     tracker.reset();
+    if (window.SSMap) SSMap.resetTrack();
     var P = model.points, A = P["T:Трилистник"].p, B = P["T:Опълченец"].p, Cc = P["T:Чирпан"].p;
     var pre = [A[0] + (A[0] - B[0]) * 0.25, A[1] + (A[1] - B[1]) * 0.25], post = [Cc[0] + (Cc[0] - B[0]) * 0.25, Cc[1] + (Cc[1] - B[1]) * 0.25];
     // междинна точка встрани, така че дължината на пътя = официалната дължина на отсечката
@@ -244,7 +248,8 @@
   $("setBtn").onclick = function () { $("sheet").classList.add("show"); };
   $("closeSet").onclick = function () { $("sheet").classList.remove("show"); };
   $("introOk").onclick = function () { $("intro").classList.remove("show"); store.set("intro", 1); unlockAudio(); };
-  $("margin").value = String(cfg.margin); $("voice").checked = cfg.voice; $("beep").checked = cfg.beep;
+  $("margin").value = String(cfg.margin); $("voice").checked = cfg.voice; $("beep").checked = cfg.beep; $("headUp").checked = cfg.headUp;
+  $("headUp").onchange = function () { cfg.headUp = this.checked; store.set("cfg", cfg); if (window.SSMap) SSMap.recenter(); };
   $("margin").onchange = function () { cfg.margin = +this.value; tracker.margin = cfg.margin; store.set("cfg", cfg); };
   $("voice").onchange = function () { cfg.voice = this.checked; store.set("cfg", cfg); };
   $("beep").onchange = function () { cfg.beep = this.checked; store.set("cfg", cfg); };
@@ -254,6 +259,7 @@
   $("testVoice").onclick = function () { unlockAudio(); beep(1); say("Начало на отсечка Чирпан – Памукчии, ограничение 140."); };
   if (store.get("intro", 0)) $("intro").classList.remove("show");
 
+  window.SSApp = { model: function () { return model; }, tracker: function () { return tracker; }, cfg: cfg, toast: toast };
   rebuild();
   var last = store.get("last", null);
   if (last && Date.now() - last.t < 6 * 3600e3) {
