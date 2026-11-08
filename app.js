@@ -225,17 +225,32 @@
       var mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], dy = b[0] - a[0], dx = (b[1] - a[1]) * Math.cos(mid[0] * Math.PI / 180), n = Math.hypot(dx, dy);
       return [mid[0] + (dx / n) * h / 111.2, mid[1] - (dy / n) * h / (111.2 * Math.cos(mid[0] * Math.PI / 180))];
     }
-    var m1 = bend(A, B, 22.021), m2 = bend(B, Cc, 13.419);
-    var legs = [[pre, A, 135], [A, m1, 152], [m1, B, 152], [B, m2, 128], [m2, Cc, 128], [Cc, post, 130]], li = 0, f = 0, t = Date.now();
+    var legs;
+    if (window.SS_GEO && SS_GEO[6] && SS_GEO[7]) { // по реалния път: Трилистник → Опълченец → Чирпан
+      legs = [[pre, A, 135]];
+      [[6, 152], [7, 128]].forEach(function (x) {
+        var pts = SSCore.decodePolyline(SS_GEO[x[0]]);
+        for (var i = 1; i < pts.length; i++) legs.push([pts[i - 1], pts[i], x[1]]);
+      });
+      legs.push([Cc, post, 130]);
+    } else {
+      var m1 = bend(A, B, 22.021), m2 = bend(B, Cc, 13.419);
+      legs = [[pre, A, 135], [A, m1, 152], [m1, B, 152], [B, m2, 128], [m2, Cc, 128], [Cc, post, 130]];
+    }
+    var li = 0, f = 0, t = Date.now();
     $("go").textContent = "Стоп"; $("go").classList.add("on");
     toast("Демо: симулирано пътуване по АМ „Тракия“");
     demoTimer = setInterval(function () {
       var L = legs[li]; if (!L) { stopDemo(); toast("Демото приключи."); return; }
-      var m = SSCore.dist(L[0], L[1]), step = L[2] / 3.6 / m;
-      f += step; t += 1000;
-      var x = Math.min(f, 1);
-      onFix({ lat: L[0][0] + (L[1][0] - L[0][0]) * x, lon: L[0][1] + (L[1][1] - L[0][1]) * x, t: t, speed: L[2] / 3.6 + (Math.random() - 0.5), acc: 5 });
-      if (f >= 1) { f = 0; li++; }
+      var rest = L[2] / 3.6, v = L[2]; // метри за 1 секунда; продължава през късите участъци
+      while (L) {
+        var m = SSCore.dist(L[0], L[1]) || 0.01, left = (1 - f) * m;
+        if (rest < left) { f += rest / m; break; }
+        rest -= left; f = 0; li++; L = legs[li];
+      }
+      t += 1000;
+      if (!L) { L = legs[legs.length - 1]; f = 1; }
+      onFix({ lat: L[0][0] + (L[1][0] - L[0][0]) * f, lon: L[0][1] + (L[1][1] - L[0][1]) * f, t: t, speed: v / 3.6 + (Math.random() - 0.5), acc: 5 });
     }, 50);
   }
   function stopDemo() {

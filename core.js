@@ -188,6 +188,20 @@
     return best ? { sec: best, dist: bd } : null;
   };
 
-  var api = { dist: dist, buildModel: buildModel, applyOverrides: applyOverrides, snapToGantries: snapToGantries, Tracker: Tracker };
+  function decodePolyline(s) { // Google polyline, 5 знака → [[lat, lon]]
+    var i = 0, la = 0, lo = 0, out = [];
+    while (i < s.length) {
+      for (var k = 0; k < 2; k++) {
+        var r = 0, sh = 0, c;
+        do { c = s.charCodeAt(i++) - 63; r |= (c & 31) << sh; sh += 5; } while (c >= 32);
+        var d = (r & 1) ? ~(r >> 1) : (r >> 1);
+        if (k) lo += d; else la += d;
+      }
+      out.push([la / 1e5, lo / 1e5]);
+    }
+    return out;
+  }
+
+  var api = { decodePolyline: decodePolyline, dist: dist, buildModel: buildModel, applyOverrides: applyOverrides, snapToGantries: snapToGantries, Tracker: Tracker };
   if (typeof module !== "undefined") module.exports = api; else root.SSCore = api;
 })(this);

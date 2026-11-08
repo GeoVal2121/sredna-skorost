@@ -4,7 +4,8 @@
   var App = window.SSApp, $ = function (id) { return document.getElementById(id); };
   var map = null, ready = false, follow = true, track = [], car = null, carEl = null;
   var heading = 0, lastP = null, lastActiveId = null, offline = false, handlers = false;
-  var COL = { approx: "#f5b041", osm: "#4da3ff", manual: "#2ecc71" };
+  var geoCache = {};
+  var COL = { approx: "#f29900", osm: "#1a73e8", manual: "#188038" };
 
   function pointsGeo() {
     var m = App.model(), km = {}, f = [];
@@ -21,7 +22,10 @@
     m.sections.forEach(function (s) {
       var pair = [s.fromKey, s.toKey].sort().join("|"), act = s.id === activeId;
       if (seen[pair] && !act) return; seen[pair] = 1;
-      f.push({ type: "Feature", geometry: { type: "LineString", coordinates: [[m.points[s.fromKey].p[1], m.points[s.fromKey].p[0]], [m.points[s.toKey].p[1], m.points[s.toKey].p[0]]] },
+      var idx = parseInt(s.id, 10), enc = window.SS_GEO && SS_GEO[idx];
+      var coords = enc ? geoCache[idx] || (geoCache[idx] = SSCore.decodePolyline(enc).map(function (q) { return [q[1], q[0]]; }))
+        : [[m.points[s.fromKey].p[1], m.points[s.fromKey].p[0]], [m.points[s.toKey].p[1], m.points[s.toKey].p[0]]];
+      f.push({ type: "Feature", geometry: { type: "LineString", coordinates: coords },
         properties: { act: act ? 1 : 0, name: s.roadName + ": " + s.from + " – " + s.to, L: s.L, limit: s.limit, up: s.upcoming ? 1 : 0 } });
     });
     return { type: "FeatureCollection", features: f };
@@ -32,35 +36,35 @@
     if (!window.maplibregl) { App.toast("Картата не се зареди. Следенето работи и без нея."); return; }
     try {
       map = new maplibregl.Map({
-        container: "map", style: "https://tiles.openfreemap.org/styles/dark",
+        container: "map", style: "https://tiles.openfreemap.org/styles/liberty",
         center: [25.4, 42.7], zoom: 6.2, attributionControl: { compact: true }, maxPitch: 60
       });
     } catch (e) { App.toast("Картата не се поддържа от този браузър."); return; }
     map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }), "top-right");
     // без интернет/плочки: празен тъмен фон, но рамките, отсечките и пътят пак се виждат
-    var fallback = { version: 8, sources: {}, layers: [{ id: "bg", type: "background", paint: { "background-color": "#10151c" } }] };
+    var fallback = { version: 8, sources: {}, layers: [{ id: "bg", type: "background", paint: { "background-color": "#eef1f4" } }] };
     var fbTimer = setTimeout(function () { if (!ready) { offline = true; map.setStyle(fallback); } }, 15000);
-    map.on("error", function (e) { if (!ready && !offline && /styles\/dark/.test(String(e && e.error && e.error.message))) { clearTimeout(fbTimer); offline = true; map.setStyle(fallback); } });
+    map.on("error", function (e) { if (!ready && !offline && /styles\/liberty/.test(String(e && e.error && e.error.message))) { clearTimeout(fbTimer); offline = true; map.setStyle(fallback); } });
     map.on("style.load", function () {
       if (map.getSource("secs")) return;
       map.addSource("secs", { type: "geojson", data: sectionsGeo(null) });
       map.addSource("pts", { type: "geojson", data: pointsGeo() });
       map.addSource("trk", { type: "geojson", data: trackGeo() });
       map.addLayer({ id: "secs", type: "line", source: "secs", layout: { "line-cap": "round" },
-        paint: { "line-color": ["case", ["==", ["get", "act"], 1], "#ff4d4d", ["==", ["get", "up"], 1], "#8a7a50", "#e0a030"],
-          "line-width": ["case", ["==", ["get", "act"], 1], 7, 4], "line-opacity": 0.85, "line-dasharray": [2, 1.2] } });
+        paint: { "line-color": ["case", ["==", ["get", "act"], 1], "#d93025", ["==", ["get", "up"], 1], "#a08a5a", "#e8710a"],
+          "line-width": ["case", ["==", ["get", "act"], 1], 8, 6], "line-opacity": 0.75 } });
       map.addLayer({ id: "trk", type: "line", source: "trk", layout: { "line-cap": "round", "line-join": "round" },
-        paint: { "line-color": "#4da3ff", "line-width": 5, "line-opacity": 0.8 } });
+        paint: { "line-color": "#4285f4", "line-width": 5, "line-opacity": 0.7 } });
       map.addLayer({ id: "pts", type: "circle", source: "pts",
         paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 4, 12, 8, 16, 11], "circle-color": ["get", "col"],
-          "circle-stroke-color": "#111", "circle-stroke-width": 2 } });
+          "circle-stroke-color": "#fff", "circle-stroke-width": 2.5 } });
       if (!offline) map.addLayer({ id: "pts-lbl", type: "symbol", source: "pts", minzoom: 9,
         layout: { "text-field": ["get", "name"], "text-size": 12, "text-offset": [0, 1.3], "text-anchor": "top", "text-font": ["Noto Sans Regular"] },
-        paint: { "text-color": "#e8eef5", "text-halo-color": "#000", "text-halo-width": 1.5 } });
+        paint: { "text-color": "#1f2933", "text-halo-color": "#fff", "text-halo-width": 1.8 } });
       map.on("click", "pts", function (e) {
         var p = e.features[0].properties, srcT = p.src === "approx" ? "приблизителна (по населеното място)" : p.src === "osm" ? "от OpenStreetMap" : "калибрирана от теб";
         new maplibregl.Popup({ offset: 10 }).setLngLat(e.lngLat)
-          .setHTML("<b>" + p.name + "</b><br>" + p.road + (p.km != null ? ", км " + String(p.km).replace(".", ",") : "") + "<br><span style='color:#8696a8'>Позиция: " + srcT + "</span>").addTo(map);
+          .setHTML("<b>" + p.name + "</b><br>" + p.road + (p.km != null ? ", км " + String(p.km).replace(".", ",") : "") + "<br><span style='color:#5f6b7a'>Позиция: " + srcT + "</span>").addTo(map);
       });
       map.on("click", "secs", function (e) {
         var p = e.features[0].properties;
