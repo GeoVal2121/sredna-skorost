@@ -92,7 +92,8 @@
     var evs = tracker.feed(fix);
     evs.forEach(onEvent);
     render(fix.t);
-    if (window.SSMap) SSMap.onFix(fix);
+    var snap = window.SSNav ? SSNav.onFix(fix) : null;
+    if (window.SSMap) SSMap.onFix(fix, snap);
     var g = $("gps");
     g.textContent = "GPS ±" + r0(fix.acc || 0) + " м";
     g.className = "chip " + ((fix.acc || 0) <= 30 ? "ok" : (fix.acc || 0) > 100 ? "bad" : "");
@@ -274,7 +275,10 @@
   $("testVoice").onclick = function () { unlockAudio(); beep(1); say("Начало на отсечка Чирпан – Памукчии, ограничение 140."); };
   if (store.get("intro", 0)) $("intro").classList.remove("show");
 
-  window.SSApp = { model: function () { return model; }, tracker: function () { return tracker; }, cfg: cfg, toast: toast };
+  window.SSApp = { model: function () { return model; }, tracker: function () { return tracker; }, cfg: cfg, toast: toast, say: say,
+    mapCenter: function () { return window.SSMap ? SSMap.center() : null; },
+    ensureRunning: function () { if (watchId == null && !demoTimer) start(); },
+    render: function () { render(Date.now()); } };
   rebuild();
   var last = store.get("last", null);
   if (last && Date.now() - last.t < 6 * 3600e3) {

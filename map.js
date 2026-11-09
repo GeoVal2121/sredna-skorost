@@ -4,6 +4,7 @@
   var App = window.SSApp, $ = function (id) { return document.getElementById(id); };
   var map = null, ready = false, follow = true, track = [], car = null, carEl = null;
   var heading = 0, lastP = null, lastActiveId = null, offline = false, handlers = false;
+  var routeLine = null, destMarker = null, touching = false, refollowT = null, userZoomUntil = 0, pressT = null, pressXY = null;
   var geoCache = {};
   var COL = { approx: "#f29900", osm: "#1a73e8", manual: "#188038" };
 
@@ -50,6 +51,11 @@
       map.addSource("secs", { type: "geojson", data: sectionsGeo(null) });
       map.addSource("pts", { type: "geojson", data: pointsGeo() });
       map.addSource("trk", { type: "geojson", data: trackGeo() });
+      map.addSource("route", { type: "geojson", data: routeGeo() });
+      map.addLayer({ id: "route-case", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": "#1557b0", "line-width": 11, "line-opacity": 0.9 } });
+      map.addLayer({ id: "route", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": "#4b8ef5", "line-width": 7 } });
       map.addLayer({ id: "secs", type: "line", source: "secs", layout: { "line-cap": "round" },
         paint: { "line-color": ["case", ["==", ["get", "act"], 1], "#d93025", ["==", ["get", "up"], 1], "#a08a5a", "#e8710a"],
           "line-width": ["case", ["==", ["get", "act"], 1], 8, 6], "line-opacity": 0.75 } });
@@ -80,15 +86,40 @@
       ready = true;
     });
     // ръчно местене на картата спира следването
+    // местене с пръст спира следването за 8 сек.; мащабиране/въртене не го спират
     map.on("dragstart", function () { setFollow(false); });
-    map.on("rotatestart", function (e) { if (e.originalEvent) setFollow(false); });
+    map.on("zoomstart", function (e) { if (e.originalEvent) userZoomUntil = Date.now() + 20000; });
+    var cv = map.getCanvasContainer();
+    cv.addEventListener("touchstart", function (e) {
+      touching = true; clearTimeout(pressT);
+      if (e.touches.length !== 1) return;
+      var t = e.touches[0], rc = cv.getBoundingClientRect(); pressXY = [t.clientX - rc.left, t.clientY - rc.top];
+      pressT = setTimeout(function () { longPress(pressXY); }, 650);
+    }, { passive: true });
+    cv.addEventListener("touchmove", function (e) {
+      if (!pressXY || !e.touches[0]) return; var t = e.touches[0], rc = cv.getBoundingClientRect();
+      if (Math.abs(t.clientX - rc.left - pressXY[0]) + Math.abs(t.clientY - rc.top - pressXY[1]) > 12) clearTimeout(pressT);
+    }, { passive: true });
+    cv.addEventListener("touchend", function () { touching = false; clearTimeout(pressT); }, { passive: true });
+    cv.addEventListener("mousedown", function () { touching = true; });
+    window.addEventListener("mouseup", function () { touching = false; });
+    map.on("contextmenu", function (e) { longPress([e.point.x, e.point.y]); });
     carEl = document.createElement("div");
     carEl.className = "car";
     carEl.innerHTML = '<svg viewBox="0 0 48 48" width="48" height="48"><defs><filter id="sh" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="1.5" stdDeviation="1.8" flood-color="#000" flood-opacity=".55"/></filter></defs><path d="M24 5 L39 40 L24 32 L9 40 Z" fill="#1a73e8" stroke="#fff" stroke-width="3.5" stroke-linejoin="round" filter="url(#sh)"/></svg>';
     $("center").onclick = function () { setFollow(true); recenter(); };
   }
 
-  function setFollow(on) { follow = on; $("center").classList.toggle("off", !on); }
+  function setFollow(on) {
+    follow = on; $("center").classList.toggle("off", !on); clearTimeout(refollowT);
+    if (!on) refollowT = setTimeout(function () { if (window.SSNav && SSNav.hasRoute() && !SSNav.active()) return; if (!touching) { setFollow(true); recenter(); } else setFollow(false); }, 8000);
+  }
+  function longPress(xy) {
+    if (!window.SSNav) return;
+    var ll = map.unproject(xy); if (navigator.vibrate) try { navigator.vibrate(30); } catch (e) { }
+    SSNav.onLongPress([ll.lat, ll.lng]);
+  }
+  function routeGeo() { return { type: "Feature", geometry: { type: "LineString", coordinates: routeLine ? routeLine.map(function (q) { return [q[1], q[0]]; }) : [] }, properties: {} }; }
 
   function bearingDeg(a, b) {
     var r = Math.PI / 180, y = Math.sin((b[1] - a[1]) * r) * Math.cos(b[0] * r),
@@ -96,23 +127,23 @@
     return (Math.atan2(y, x) / r + 360) % 360;
   }
 
-  function onFix(fix) {
+  function onFix(fix, snap) {
     if (!map) return;
-    var p = [fix.lat, fix.lon];
+    var p = snap || [fix.lat, fix.lon];
     if (fix.heading != null && !isNaN(fix.heading) && (fix.speed || 0) > 2) heading = fix.heading;
     else if (lastP && SSCore.dist(lastP, p) > 8) heading = bearingDeg(lastP, p);
-    if (!lastP || SSCore.dist(lastP, p) > 8) {
-      lastP = p;
-      track.push([fix.lon, fix.lat]); if (track.length > 6000) track.shift();
-    }
-    if (!car) car = new maplibregl.Marker({ element: carEl, rotationAlignment: "map", pitchAlignment: "viewport" }).setLngLat([fix.lon, fix.lat]).addTo(map);
-    car.setLngLat([fix.lon, fix.lat]).setRotation(heading);
+    var moved = !lastP || SSCore.dist(lastP, p) > 8;
+    lastP = p;
+    // следа само от точни позиции (или прилепени към маршрута)
+    if (moved && (snap || !fix.acc || fix.acc <= 25)) { track.push([p[1], p[0]]); if (track.length > 6000) track.shift(); }
+    if (!car) car = new maplibregl.Marker({ element: carEl, rotationAlignment: "map", pitchAlignment: "viewport" }).setLngLat([p[1], p[0]]).addTo(map);
+    car.setLngLat([p[1], p[0]]).setRotation(heading);
     if (ready) {
       map.getSource("trk").setData(trackGeo());
       var st = App.tracker().active, id = st ? st.sec.id : null;
       if (id !== lastActiveId) { lastActiveId = id; map.getSource("secs").setData(sectionsGeo(id)); }
     }
-    if (follow) recenter(true);
+    if (follow && !touching) recenter(true);
   }
 
   function recenter(soft) {
@@ -124,6 +155,13 @@
     var opt = { center: [lastP[1], lastP[0]], duration: dur,
       bearing: up ? (moving ? heading : map.getBearing()) : 0, pitch: up ? 50 : 0,
       padding: { top: 120, bottom: 220, left: 0, right: 0 } };
+    // при навигация мащабът следва скоростта (докато не е пипан ръчно)
+    if (window.SSNav && SSNav.active() && now > userZoomUntil) {
+      var v = App.tracker().speed; opt.zoom = v > 90 ? 15 : v > 50 ? 16 : 17;
+    }
+    // ако стрелката е излязла от екрана, скок без анимация
+    var pt = map.project([lastP[1], lastP[0]]), cv = map.getCanvas();
+    if (pt.x < 0 || pt.y < 0 || pt.x > cv.clientWidth || pt.y > cv.clientHeight) opt.duration = 0;
     map.easeTo(opt);
   }
 
@@ -134,6 +172,21 @@
   }
   function resetTrack() { track = []; lastP = null; if (ready) map.getSource("trk").setData(trackGeo()); setFollow(true); }
 
-  window.SSMap = { onFix: onFix, refresh: refresh, recenter: function () { setFollow(true); recenter(); }, resetTrack: resetTrack };
+  function setRoute(line, fit) {
+    routeLine = line; if (ready) map.getSource("route").setData(routeGeo());
+    if (line && fit && map) {
+      var b = new maplibregl.LngLatBounds(); line.forEach(function (q) { b.extend([q[1], q[0]]); });
+      setFollow(false); clearTimeout(refollowT);
+      map.fitBounds(b, { padding: { top: 90, bottom: 300, left: 40, right: 40 }, bearing: 0, pitch: 0, duration: 700 });
+    }
+  }
+  function setDest(p) {
+    if (destMarker) { destMarker.remove(); destMarker = null; }
+    if (p && map) destMarker = new maplibregl.Marker({ color: "#d93025" }).setLngLat([p[1], p[0]]).addTo(map);
+  }
+  function center() { if (!map) return null; var c = map.getCenter(); return [c.lat, c.lng]; }
+
+  window.SSMap = { onFix: onFix, refresh: refresh, recenter: function () { setFollow(true); recenter(); }, resetTrack: resetTrack,
+    setRoute: setRoute, setDest: setDest, center: center, follow: function () { setFollow(true); recenter(); } };
   init();
 })();

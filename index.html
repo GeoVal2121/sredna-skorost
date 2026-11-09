@@ -13,6 +13,7 @@
 :root{--bg:#eef1f4;--panel:#fffffff2;--line:#d8dee6;--tx:#1f2933;--mut:#5f6b7a;--ok:#188038;--warn:#e37400;--bad:#d93025;--acc:#1a73e8;
   --st:env(safe-area-inset-top);--sb:env(safe-area-inset-bottom)}
 *{box-sizing:border-box;margin:0}
+[hidden]{display:none!important}
 html,body{height:100%;overflow:hidden}
 body{background:var(--bg);color:var(--tx);font:16px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
 #map{position:fixed;inset:0;background:#eef1f4}
@@ -86,6 +87,35 @@ button:active{transform:scale(.97)}
 .btns button{flex:1;min-width:140px}
 .toast{position:fixed;left:50%;bottom:calc(var(--sb) + 190px);transform:translateX(-50%);background:#202124ee;color:#fff;border:1px solid #202124;padding:10px 14px;border-radius:10px;font-size:14px;display:none;z-index:9;max-width:90vw;text-align:center}
 .intro p{margin:8px 0;color:var(--mut);font-size:15px}
+/* навигация */
+.searchBtn{display:flex;align-items:center;gap:10px;background:#fff;border-radius:28px;padding:12px 16px;font-size:16px;color:var(--mut);box-shadow:0 2px 10px #0003;border:1px solid var(--line);text-align:left}
+body.navigating .searchBtn,body.navigating #idle{display:none}
+.navb{background:#0b8043;color:#fff;border-radius:16px;padding:12px 14px;box-shadow:0 3px 12px #0004}
+.nrow{display:flex;align-items:center;gap:12px}
+.nico{width:48px;height:48px;flex:none}
+.nico svg{width:48px;height:48px}
+.ntx b{display:block;font-size:26px;line-height:1.1}
+.ntx span{font-size:17px;line-height:1.25}
+.neta{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid #ffffff40;font-size:14px}
+.neta button{background:#ffffff26;border:0;color:#fff;padding:7px 14px;border-radius:10px;font-weight:600}
+.prev{position:fixed;left:10px;right:10px;bottom:calc(var(--sb) + 10px);z-index:4;max-width:520px;max-height:60vh;overflow:auto}
+.prev b{font-size:17px}
+.prev .sum{margin:6px 0;font-size:15px}.prev .sum span{color:var(--ok);font-weight:700}
+.prev .secs{margin:6px 0;font-size:14px;color:var(--warn);font-weight:600}.prev .secs small{color:var(--mut);font-weight:400;font-size:12px}
+.pbtn{display:flex;gap:8px;margin-top:10px}.pbtn button{flex:1;padding:12px}
+.pbtn.small button{padding:8px;font-size:13px;color:var(--mut)}
+button.primary{background:#1a73e8;border-color:#1a73e8;color:#fff;font-weight:600}
+button:disabled{opacity:.5}
+.srch{position:fixed;inset:0;background:#fff;z-index:6;display:none;flex-direction:column;padding-top:var(--st)}
+.srch.show{display:flex}
+.srow{display:flex;gap:8px;padding:10px;border-bottom:1px solid var(--line)}
+.srow button{border:0;background:none;font-size:22px;padding:6px 10px}
+.srow input{flex:1;font:inherit;font-size:17px;border:0;outline:0;background:#f1f4f8;border-radius:22px;padding:10px 16px}
+#sug{overflow:auto}
+.sg{display:flex;gap:12px;align-items:center;padding:12px 14px;border-bottom:1px solid #eef1f4;cursor:pointer}
+.sg .ico{width:32px;height:32px;border-radius:50%;background:#f1f4f8;display:grid;place-items:center;color:var(--mut);flex:none}
+.sg b{display:block;font-weight:600}.sg small{color:var(--mut)}
+.sg.none{cursor:default}
 .intro p b{color:var(--tx)}
 </style>
 </head>
@@ -93,6 +123,11 @@ button:active{transform:scale(.97)}
 <div id="map"></div>
 
 <div class="top">
+  <div class="navb" id="navb" hidden>
+    <div class="nrow"><div class="nico" id="navIco"></div><div class="ntx"><b id="navDist"></b><span id="navTxt"></span></div></div>
+    <div class="neta"><span id="navEta"></span><button id="endNav">Край</button></div>
+  </div>
+  <button class="searchBtn" id="searchBtn"><svg viewBox="0 0 24 24" width="20" height="20"><circle cx="10" cy="10" r="6.5" fill="none" stroke="#5f6b7a" stroke-width="2.2"/><path d="M15 15 L21 21" stroke="#5f6b7a" stroke-width="2.4" stroke-linecap="round"/></svg>Накъде?</button>
   <div class="card" id="idle"><div id="nearest" class="mut">Натисни „Старт“, за да започне следенето.</div></div>
   <div class="card" id="act" hidden>
     <div class="sec-name"><div><small id="aRoad"></small><span id="aName"></span></div><div class="limit" id="aLim">140</div></div>
@@ -117,9 +152,20 @@ button:active{transform:scale(.97)}
   <button id="setBtn" aria-label="Настройки">☰</button>
 </div>
 
-<div class="bottom">
+<div class="bottom" id="bottomBar">
   <button id="go">Старт</button>
   <button id="cal">Тук е рамка</button>
+</div>
+
+<div class="card prev" id="prev" hidden>
+  <div id="prevBody"></div>
+  <div class="pbtn"><button id="goNav" class="primary">Тръгни</button><button id="cancelNav">Отказ</button></div>
+  <div class="pbtn small"><button id="saveHome">Запази като Вкъщи</button><button id="saveWork">Запази като Работа</button></div>
+</div>
+
+<div class="srch" id="srch">
+  <div class="srow"><button id="srchClose" aria-label="Назад">←</button><input id="q" type="search" placeholder="Търси адрес, град или обект" autocomplete="off" enterkeyhint="search"></div>
+  <div id="sug"></div>
 </div>
 
 <div class="sheet" id="sheet"><div>
@@ -162,5 +208,7 @@ button:active{transform:scale(.97)}
 <script src="core.js"></script>
 <script src="app.js"></script>
 <script src="map.js"></script>
+<script src="navcore.js"></script>
+<script src="nav.js"></script>
 </body>
 </html>
