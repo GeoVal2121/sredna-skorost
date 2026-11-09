@@ -2,7 +2,7 @@
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
   // ---------- нова версия: ако телефонът е запазил стара, презарежда се автоматично ----------
-  var APP_VERSION = "2026.11.09-1";
+  var APP_VERSION = "2026.11.09-2";
   try {
     fetch("version.json?t=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
       if (j && j.v && j.v !== APP_VERSION && sessionStorage.getItem("ss_reload") !== j.v) {
@@ -79,7 +79,7 @@
     }
   }
   function say(text, urgent) {
-    if (!cfg.voice) return;
+    if (!cfg.voice || document.hidden) return;
     if (!voices.length) loadVoices();
     if (useBuiltin() && window.SSTTS) {
       SSTTS.speak(text, urgent, ac).catch(function () { toast("Вграденият глас не се зареди."); });
@@ -175,7 +175,7 @@
   }
   function stop() {
     if (watchId != null) navigator.geolocation.clearWatch(watchId);
-    watchId = null; stopDemo();
+    watchId = null; stopDemo(); hush();
     if (wake) { try { wake.release(); } catch (e) { } wake = null; }
     $("go").textContent = "Старт"; $("go").classList.remove("on");
     $("gps").textContent = "GPS: изкл."; $("gps").className = "chip";
@@ -184,10 +184,37 @@
     if (!("wakeLock" in navigator)) return;
     navigator.wakeLock.request("screen").then(function (w) { wake = w; }).catch(function () { });
   }
+  // без фонов режим: извън екрана гласът млъква и GPS спира; при връщане следенето продължава
+  var resumeGps = false;
+  function hush() {
+    try { if (window.speechSynthesis) speechSynthesis.cancel(); } catch (e) { }
+    try { if (ac && ac.state === "running") ac.suspend(); } catch (e) { }
+  }
+  function toBackground() {
+    resumeGps = resumeGps || watchId != null;
+    if (watchId != null || demoTimer) stop();
+    hush(); wake = null;
+  }
   document.addEventListener("visibilitychange", function () {
-    if (document.visibilityState === "visible" && (watchId != null || demoTimer) && !wake) keepAwake();
-    if (document.visibilityState === "hidden") wake = null;
+    if (document.visibilityState === "hidden") { toBackground(); return; }
+    applyTheme();
+    if (resumeGps) { resumeGps = false; start(); }
   });
+  window.addEventListener("pagehide", toBackground);
+
+  // тъмен режим след залез и до изгрев (по последната позиция или центъра на картата)
+  var dark = null;
+  function applyTheme() {
+    var p = lastFix ? [lastFix.lat, lastFix.lon] : (window.SSMap && SSMap.center()) || [42.7, 23.32];
+    var d = SSCore.sunAlt(p[0], p[1], Date.now()) < -0.833;
+    if (d === dark) return;
+    dark = d;
+    document.documentElement.classList.toggle("dark", d);
+    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = d ? "#1e2740" : "#ffffff";
+    if (window.SSMap && SSMap.setTheme) SSMap.setTheme(d);
+  }
+  applyTheme();
+  setInterval(applyTheme, 60000);
 
   // ---------- OSM рамки ----------
   function loadOsm(manualClick) {
@@ -340,6 +367,7 @@
 
   window.SSApp = { model: function () { return model; }, tracker: function () { return tracker; }, cfg: cfg, toast: toast, say: say,
     mapCenter: function () { return window.SSMap ? SSMap.center() : null; },
+    isDark: function () { return !!dark; },
     ensureRunning: function () { if (watchId == null && !demoTimer) start(); },
     render: function () { render(Date.now()); } };
   rebuild();

@@ -233,6 +233,15 @@
     return out;
   }
 
-  var api = { CamWatch: CamWatch, bearing: bearing, decodePolyline: decodePolyline, dist: dist, buildModel: buildModel, applyOverrides: applyOverrides, snapToGantries: snapToGantries, Tracker: Tracker };
+  // височина на слънцето в градуси (точност ~0,5°); под -0,833° = след залез / преди изгрев
+  function sunAlt(lat, lon, t) {
+    var d = t / 864e5 - 10957.5, g = rad(357.529 + 0.98560028 * d), q = 280.459 + 0.98564736 * d;
+    var L = rad(q + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g)), e = rad(23.439 - 3.6e-7 * d);
+    var dec = Math.asin(Math.sin(e) * Math.sin(L)), ra = Math.atan2(Math.cos(e) * Math.sin(L), Math.cos(L));
+    var H = rad(280.46061837 + 360.98564736629 * d + lon) - ra;
+    return Math.asin(Math.sin(rad(lat)) * Math.sin(dec) + Math.cos(rad(lat)) * Math.cos(dec) * Math.cos(H)) * 180 / Math.PI;
+  }
+
+  var api = { sunAlt: sunAlt, CamWatch: CamWatch, bearing: bearing, decodePolyline: decodePolyline, dist: dist, buildModel: buildModel, applyOverrides: applyOverrides, snapToGantries: snapToGantries, Tracker: Tracker };
   if (typeof module !== "undefined") module.exports = api; else root.SSCore = api;
 })(this);

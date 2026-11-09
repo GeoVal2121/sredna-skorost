@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
-<link rel="stylesheet" href="lib/maplibre-gl.css?v=2026.11.09-1">
+<link rel="stylesheet" href="lib/maplibre-gl.css?v=2026.11.09-2">
 <style>
 :root{--bg:#eef1f4;--panel:#fffffff2;--line:#d8dee6;--tx:#1f2933;--mut:#5f6b7a;--ok:#188038;--warn:#e37400;--bad:#d93025;--acc:#1a73e8;
   --st:env(safe-area-inset-top);--sb:env(safe-area-inset-bottom)}
@@ -127,6 +127,22 @@ button:disabled{opacity:.5}
 .tabs button.on{background:#e8f0fe;color:#1a73e8;font-weight:600}
 .nleft{font-size:22px;margin-right:10px}
 .intro p b{color:var(--tx)}
+html.dark{--bg:#1e2740;--panel:#26314ff2;--line:#3d4a6b;--tx:#e8eaed;--mut:#a3adb8;color-scheme:dark}
+html.dark #map{background:#1e2740}
+html.dark .sheet>div,html.dark .srch,html.dark .searchBtn,html.dark .maplibregl-popup-content{background:#26314f}
+html.dark .cell,html.dark .row select,html.dark .row input,html.dark .tag,html.dark .srow input,html.dark .sg .ico,html.dark .aform input,html.dark .tabs button{background:#303c5c;color:var(--tx)}
+html.dark .bar{background:#3d4a6b}
+html.dark .list div,html.dark .sg{border-color:#3d4a6b}
+html.dark .tabs button.on{background:#1a3a66;color:#8ab4f8}
+html.dark .spd:not(.over){background:#26314f;color:#e8eaed;border-color:#3d4a6b}
+html.dark .spd:not(.over) span,html.dark .maplibregl-popup-close-button{color:#a3adb8}
+html.dark .maplibregl-ctrl-attrib{background:#26314fcc!important;color:#a3adb8}
+html.dark .maplibregl-ctrl-attrib a{color:#c8ccd0}
+html.dark .maplibregl-ctrl-icon{filter:invert(1)}
+html.dark [class*=popup-anchor-bottom] .maplibregl-popup-tip{border-top-color:#26314f}
+html.dark [class*=popup-anchor-top] .maplibregl-popup-tip{border-bottom-color:#26314f}
+html.dark .maplibregl-popup-anchor-left .maplibregl-popup-tip{border-right-color:#26314f}
+html.dark .maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color:#26314f}
 </style>
 </head>
 <body>
@@ -222,15 +238,15 @@ button:disabled{opacity:.5}
 
 <div class="toast" id="toast"></div>
 
-<script src="lib/maplibre-gl.js?v=2026.11.09-1"></script>
-<script src="towns.js?v=2026.11.09-1"></script>
-<script src="data.js?v=2026.11.09-1"></script>
-<script src="cameras.js?v=2026.11.09-1"></script>
-<script src="geometry.js?v=2026.11.09-1"></script>
-<script src="core.js?v=2026.11.09-1"></script>
-<script src="app.js?v=2026.11.09-1"></script>
-<script src="map.js?v=2026.11.09-1"></script>
-<script src="navcore.js?v=2026.11.09-1"></script>
-<script src="nav.js?v=2026.11.09-1"></script>
+<script src="lib/maplibre-gl.js?v=2026.11.09-2"></script>
+<script src="towns.js?v=2026.11.09-2"></script>
+<script src="data.js?v=2026.11.09-2"></script>
+<script src="cameras.js?v=2026.11.09-2"></script>
+<script src="geometry.js?v=2026.11.09-2"></script>
+<script src="core.js?v=2026.11.09-2"></script>
+<script src="app.js?v=2026.11.09-2"></script>
+<script src="map.js?v=2026.11.09-2"></script>
+<script src="navcore.js?v=2026.11.09-2"></script>
+<script src="nav.js?v=2026.11.09-2"></script>
 </body>
 </html>

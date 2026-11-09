@@ -5,7 +5,16 @@
   var map = null, ready = false, follow = true, track = [], car = null, carEl = null;
   var heading = 0, lastP = null, lastActiveId = null, offline = false, handlers = false;
   var routeLine = null, destMarker = null, touching = false, refollowT = null, userZoomUntil = 0, pressT = null, pressXY = null;
-  var geoCache = {};
+  var geoCache = {}, isDark = !!App.isDark(), fallback = null;
+  function styleUrl(d) { return "https://tiles.openfreemap.org/styles/" + (d ? "fiord" : "liberty"); }
+  // смяна светло/тъмно: новият стил минава пак през style.load и слоевете ни се добавят наново
+  function setTheme(d) {
+    if (d === isDark) return;
+    isDark = d;
+    if (!map) return;
+    ready = false;
+    map.setStyle(offline ? fallback() : styleUrl(d), { diff: false });
+  }
   var COL = { approx: "#f29900", osm: "#1a73e8", manual: "#188038" };
 
   function pointsGeo() {
@@ -52,15 +61,15 @@
     if (!window.maplibregl) { App.toast("Картата не се зареди. Следенето работи и без нея."); return; }
     try {
       map = new maplibregl.Map({
-        container: "map", style: "https://tiles.openfreemap.org/styles/liberty",
+        container: "map", style: styleUrl(App.isDark()),
         center: [25.4, 42.7], zoom: 6.2, attributionControl: { compact: true }, maxPitch: 60
       });
     } catch (e) { App.toast("Картата не се поддържа от този браузър."); return; }
     map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }), "top-right");
     // без интернет/плочки: празен тъмен фон, но рамките, отсечките и пътят пак се виждат
-    var fallback = { version: 8, sources: {}, layers: [{ id: "bg", type: "background", paint: { "background-color": "#eef1f4" } }] };
-    var fbTimer = setTimeout(function () { if (!ready) { offline = true; map.setStyle(fallback); } }, 15000);
-    map.on("error", function (e) { if (!ready && !offline && /styles\/liberty/.test(String(e && e.error && e.error.message))) { clearTimeout(fbTimer); offline = true; map.setStyle(fallback); } });
+    fallback = function () { return { version: 8, sources: {}, layers: [{ id: "bg", type: "background", paint: { "background-color": isDark ? "#2b3550" : "#eef1f4" } }] }; };
+    var fbTimer = setTimeout(function () { if (!ready) { offline = true; map.setStyle(fallback()); } }, 15000);
+    map.on("error", function (e) { if (!ready && !offline && /styles\/(liberty|fiord)/.test(String(e && e.error && e.error.message))) { clearTimeout(fbTimer); offline = true; map.setStyle(fallback()); } });
     map.on("style.load", function () {
       if (map.getSource("secs")) return;
       map.addSource("secs", { type: "geojson", data: sectionsGeo(null) });
@@ -68,7 +77,10 @@
       map.addSource("trk", { type: "geojson", data: trackGeo() });
       map.addSource("route", { type: "geojson", data: routeGeo() });
       // линиите под надписите и номерата на пътищата от картата
-      var sym = (map.getStyle().layers || []).filter(function (l) { return l.type === "symbol"; })[0], below = sym ? sym.id : undefined;
+      // над пътищата, под надписите (в някои стилове има надписи и преди пътищата)
+      var ls = map.getStyle().layers || [], lastRoad = -1;
+      ls.forEach(function (l, i) { if (l.type === "line" && /highway|road|transportation|motorway/.test(l.id)) lastRoad = i; });
+      var sym = ls.filter(function (l, i) { return l.type === "symbol" && i > lastRoad; })[0], below = sym ? sym.id : undefined;
       var addBelow = function (l) { map.addLayer(l, below); };
       addBelow({ id: "route-case", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" },
         paint: { "line-color": "#1557b0", "line-width": 11, "line-opacity": 0.9 } });
@@ -85,13 +97,15 @@
       map.addLayer({ id: "cams", type: "symbol", source: "cams", minzoom: 8,
         layout: { "icon-image": "cam", "icon-size": ["interpolate", ["linear"], ["zoom"], 8, 0.6, 14, 1], "icon-allow-overlap": true,
           "text-field": offline ? "" : ["get", "lim"], "text-font": ["Noto Sans Bold"], "text-size": 11, "text-offset": [0, 1.5], "text-anchor": "top", "text-allow-overlap": true },
-        paint: { "text-color": "#d93025", "text-halo-color": "#fff", "text-halo-width": 1.8 } });
+        paint: { "text-color": isDark ? "#ff8a80" : "#d93025", "text-halo-color": isDark ? "#26314f" : "#fff", "text-halo-width": 1.8 } });
       map.addLayer({ id: "pts", type: "circle", source: "pts",
         paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 4, 12, 8, 16, 11], "circle-color": ["get", "col"],
           "circle-stroke-color": "#fff", "circle-stroke-width": 2.5 } });
       if (!offline) map.addLayer({ id: "pts-lbl", type: "symbol", source: "pts", minzoom: 9,
         layout: { "text-field": ["get", "name"], "text-size": 12, "text-offset": [0, 1.3], "text-anchor": "top", "text-font": ["Noto Sans Regular"] },
-        paint: { "text-color": "#1f2933", "text-halo-color": "#fff", "text-halo-width": 1.8 } });
+        paint: { "text-color": isDark ? "#e8eaed" : "#1f2933", "text-halo-color": isDark ? "#26314f" : "#fff", "text-halo-width": 1.8 } });
+      if (handlers) { ready = true; refresh(); return; }
+      handlers = true;
       map.on("click", "pts", function (e) {
         var p = e.features[0].properties, srcT = p.src === "approx" ? "приблизителна (по населеното място)" : p.src === "osm" ? "от OpenStreetMap" : "калибрирана от теб";
         new maplibregl.Popup({ offset: 10 }).setLngLat(e.lngLat)
@@ -102,8 +116,6 @@
         new maplibregl.Popup({ offset: 6 }).setLngLat(e.lngLat)
           .setHTML("<b>" + p.name + "</b><br>" + String((+p.L).toFixed(1)).replace(".", ",") + " км · ограничение " + p.limit + (p.up == 1 ? "<br>предстояща" : "")).addTo(map);
       });
-      if (handlers) { ready = true; refresh(); return; }
-      handlers = true;
       map.on("click", "cams", function (e) {
         var p = e.features[0].properties;
         new maplibregl.Popup({ offset: 14 }).setLngLat(e.lngLat)
@@ -238,6 +250,6 @@
   function center() { if (!map) return null; var c = map.getCenter(); return [c.lat, c.lng]; }
 
   window.SSMap = { onFix: onFix, refresh: refresh, recenter: function () { setFollow(true); recenter(); }, resetTrack: resetTrack,
-    setRoute: setRoute, setDest: setDest, center: center, follow: function () { setFollow(true); recenter(); } };
+    setRoute: setRoute, setDest: setDest, center: center, setTheme: setTheme, follow: function () { setFollow(true); recenter(); } };
   init();
 })();
