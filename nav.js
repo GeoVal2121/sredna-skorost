@@ -19,17 +19,20 @@
   // ---------- търсене ----------
   var qTimer = null, qSeq = 0;
   function openSearch() {
-    $("srch").classList.add("show"); $("q").value = ""; renderSuggestions([]);
+    $("srch").classList.add("show"); $("q").value = ""; setMode("free");
     setTimeout(function () { $("q").focus(); }, 50);
   }
   function closeSearch() { $("srch").classList.remove("show"); $("q").blur(); }
-  function label(f) {
-    var p = f.properties, main = p.name || [p.street, p.housenumber].filter(Boolean).join(" ") || p.city || "Точка";
-    var sub = [p.name && p.street ? p.street + (p.housenumber ? " " + p.housenumber : "") : "", p.city || p.county || "", p.country && p.country !== "България" && p.country !== "Bulgaria" ? p.country : ""]
-      .filter(function (x) { return x && x !== main; }).join(", ");
-    var v = p.osm_value, kind = p.osm_key === "place" ? ({ city: "град", town: "град", village: "село", hamlet: "махала", suburb: "квартал", neighbourhood: "квартал" }[v] || "място")
-      : p.osm_key === "highway" ? "улица" : p.housenumber ? "адрес" : "обект";
-    return { main: main, sub: kind + (sub ? " · " + sub : "") };
+  function label(f) { return NC.fmtPhoton(f.properties); }
+  var ICO = { place: "◉", street: "═", addr: "№", poi: "●" };
+  function townOf(p) { return p.city || p.town || p.village || (p.state === "София-град" ? "София" : ""); }
+  function renderRows(rows) {
+    $("sug").innerHTML = rows.map(function (r, i) {
+      return "<div class='sg" + (r.none ? " none" : "") + "' data-i='" + i + "'><span class='ico'>" + (r.ico || "") + "</span><div><b>" + esc(r.main) + "</b><small>" + esc(r.sub || "") + "</small></div></div>";
+    }).join("");
+    Array.prototype.forEach.call($("sug").querySelectorAll(".sg:not(.none)"), function (el) {
+      el.onclick = function () { var r = rows[+el.dataset.i]; if (r.pick) return r.pick(); closeSearch(); preview({ p: r.p, name: r.name }); };
+    });
   }
   function renderSuggestions(feats) {
     var rows = [];
@@ -41,17 +44,82 @@
     }
     var seen = {};
     feats.filter(function (f) { return f.properties.osm_key !== "boundary"; }).forEach(function (f) {
-      var l = label(f), key = l.main + "|" + l.sub; if (seen[key]) return; seen[key] = 1; rows.push({ main: l.main, sub: l.sub, p: [f.geometry.coordinates[1], f.geometry.coordinates[0]], name: l.main + (f.properties.city && f.properties.city !== l.main ? ", " + f.properties.city : ""), ico: "◎" }); });
-    $("sug").innerHTML = rows.map(function (r, i) {
-      return "<div class='sg" + (r.none ? " none" : "") + "' data-i='" + i + "'><span class='ico'>" + (r.ico || "") + "</span><div><b>" + esc(r.main) + "</b><small>" + esc(r.sub || "") + "</small></div></div>";
-    }).join("");
-    Array.prototype.forEach.call($("sug").querySelectorAll(".sg:not(.none)"), function (el) {
-      el.onclick = function () { var r = rows[+el.dataset.i]; closeSearch(); preview({ p: r.p, name: r.name }); };
-    });
+      var l = label(f), key = l.main + "|" + l.sub; if (seen[key]) return; seen[key] = 1;
+      var t = townOf(f.properties);
+      rows.push({ main: l.main, sub: l.sub, p: [f.geometry.coordinates[1], f.geometry.coordinates[0]], name: l.main + (t && l.kind !== "place" ? ", " + t : ""), ico: ICO[l.kind] }); });
+    if ($("q").value.trim() && !rows.length) rows.push({ main: "Няма резултати", sub: "Опитай с „Град, улица, номер“", none: 1 });
+    renderRows(rows);
+  }
+
+  // ---------- адрес: град, улица, номер ----------
+  var aCity = null, aStreet = null, aTimer = null, aSeq = 0;
+  function setMode(m) {
+    $("tabFree").classList.toggle("on", m === "free"); $("tabAddr").classList.toggle("on", m === "addr");
+    $("q").hidden = m !== "free"; $("addrForm").hidden = m !== "addr";
+    if (m === "free") { renderSuggestions([]); $("q").focus(); } else { renderRows([]); $("fCity").focus(); }
+  }
+  function photon(q, tags, near, cb) {
+    var seq = ++aSeq, c = near || here() || App.mapCenter() || [42.7, 25.3];
+    fetch(PHOTON + "api/?lang=default&limit=12&q=" + encodeURIComponent(q) + tags.map(function (t) { return "&osm_tag=" + t; }).join("") + "&lat=" + c[0] + "&lon=" + c[1], { signal: AbortSignal.timeout(10000) })
+      .then(function (r) { return r.json(); }).then(function (j) { if (seq === aSeq) cb(j.features || []); })
+      .catch(function () { if (seq === aSeq) renderRows([{ main: "Търсенето не отговаря", sub: "Провери връзката", none: 1 }]); });
+  }
+  function cityInput() {
+    aCity = null; aStreet = null; var q = $("fCity").value.trim(); clearTimeout(aTimer);
+    if (q.length < 2) { renderRows([]); return; }
+    aTimer = setTimeout(function () {
+      photon(q, ["place:city", "place:town", "place:village", "place:hamlet"], null, function (fs) {
+        var seen = {};
+        renderRows(fs.map(function (f) { var l = label(f); return { main: l.main, sub: l.sub, p: [f.geometry.coordinates[1], f.geometry.coordinates[0]], ico: "◉",
+          raw: f.properties.name, key: l.main + l.sub }; }).filter(function (r) { if (seen[r.key]) return false; seen[r.key] = 1; return true; })
+          .map(function (r) { r.pick = function () { aCity = { name: r.raw, label: r.main, p: r.p }; $("fCity").value = r.main; renderRows([{ main: "Град: " + r.main, sub: "Сега въведи улица", none: 1 }]); $("fStreet").focus(); }; return r; }));
+      });
+    }, 300);
+  }
+  function streetInput() {
+    aStreet = null; var q = $("fStreet").value.trim(); clearTimeout(aTimer);
+    if (q.length < 2) { renderRows([]); return; }
+    if (!aCity) { renderRows([{ main: "Първо избери град от списъка", none: 1 }]); return; }
+    aTimer = setTimeout(function () {
+      photon(q + " " + aCity.name, ["highway", "place:square"], aCity.p, function (fs) {
+        var seen = {};
+        var rows = fs.filter(function (f) {
+          var t = townOf(f.properties), c = [f.geometry.coordinates[1], f.geometry.coordinates[0]];
+          var pr = f.properties, isSq = pr.osm_value === "square";
+          return (pr.osm_key === "highway" || isSq) && (t === aCity.name || SSCore.dist(c, aCity.p) < 15000);
+        }).map(function (f) { var l = label(f); return { main: l.main, sub: l.sub, p: [f.geometry.coordinates[1], f.geometry.coordinates[0]], ico: "═", raw: f.properties.name }; })
+          .filter(function (r) { if (seen[r.main]) return false; seen[r.main] = 1; return true; })
+          .map(function (r) { r.pick = function () { aStreet = { name: r.raw, label: r.main, p: r.p }; $("fStreet").value = r.main; renderRows([{ main: r.main + ", " + aCity.label, sub: "Въведи номер или натисни „Намери адреса“", none: 1 }]); $("fNum").focus(); }; return r; });
+        renderRows(rows.length ? rows : [{ main: "Няма такава улица в " + aCity.label, sub: "Провери изписването", none: 1 }]);
+      });
+    }, 300);
+  }
+  function findAddress() {
+    var num = $("fNum").value.trim(), st = aStreet ? aStreet.name : $("fStreet").value.trim();
+    if (!aCity) { renderRows([{ main: "Избери град от списъка", none: 1 }]); return; }
+    if (!st) { closeSearch(); preview({ p: aCity.p, name: aCity.label }); return; }
+    renderRows([{ main: "Търся адреса…", none: 1 }]);
+    var u = "https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&accept-language=bg&countrycodes=bg&limit=6" +
+      "&street=" + encodeURIComponent((num ? num + " " : "") + st) + "&city=" + encodeURIComponent(aCity.name);
+    fetch(u, { signal: AbortSignal.timeout(12000) }).then(function (r) { return r.json(); }).then(function (list) {
+      var seen = {};
+      var rows = (list || []).map(function (it) { var f = NC.fmtNominatim(it); return { main: f.main, sub: f.sub, p: f.p, name: f.main + ", " + aCity.label, ico: f.exact ? "№" : "═", exact: f.exact }; })
+        .filter(function (r) { var k = r.main + "|" + r.sub; if (seen[k]) return false; seen[k] = 1; return true; });
+      var exact = rows.filter(function (r) { return r.exact; });
+      if (num && exact.length === 1) { closeSearch(); preview({ p: exact[0].p, name: exact[0].name }); return; }
+      if (num && !exact.length) {
+        // номерът го няма в картата — предлага улицата
+        var fall = aStreet ? [{ main: aStreet.label, sub: "№ " + num + " не е отбелязан в картата · води до улицата", p: aStreet.p, name: aStreet.label + " " + num + ", " + aCity.label, ico: "═" }] : [];
+        var others = rows.filter(function (r) { return !aStreet || r.main !== aStreet.label || r.sub.indexOf(aCity.name) < 0; });
+        renderRows(fall.concat(others).length ? fall.concat(others) : [{ main: "Не намерих адреса", sub: "Опитай без номер", none: 1 }]); return;
+      }
+      if (!rows.length && aStreet) rows = [{ main: aStreet.label, sub: aCity.label, p: aStreet.p, name: aStreet.label + ", " + aCity.label, ico: "═" }];
+      renderRows(rows.length ? rows : [{ main: "Не намерих адреса", sub: "Провери улицата", none: 1 }]);
+    }).catch(function () { renderRows([{ main: "Търсенето на адрес не отговаря", sub: "Опитай пак след малко", none: 1 }]); });
   }
   function search(q) {
     var seq = ++qSeq, c = here() || App.mapCenter() || [42.7, 25.3];
-    fetch(PHOTON + "api/?limit=10&q=" + encodeURIComponent(q) + "&lat=" + c[0] + "&lon=" + c[1], { signal: AbortSignal.timeout(10000) })
+    fetch(PHOTON + "api/?lang=default&limit=10&q=" + encodeURIComponent(q) + "&lat=" + c[0] + "&lon=" + c[1], { signal: AbortSignal.timeout(10000) })
       .then(function (r) { return r.json(); })
       .then(function (j) { if (seq === qSeq) renderSuggestions(j.features || []); })
       .catch(function () { if (seq === qSeq) $("sug").innerHTML = "<div class='sg none'><div><b>Търсенето не отговаря</b><small>Провери връзката и опитай пак</small></div></div>"; });
@@ -156,17 +224,18 @@
     var n = pr.next;
     $("navIco").innerHTML = icon(n);
     $("navDist").textContent = n ? NC.distText(pr.toNext) : "";
-    $("navTxt").textContent = n ? n.text : "Следвайте маршрута";
-    $("navEta").textContent = clock(pr.remDur) + " · " + NC.distText(pr.remaining) + " · " + fmtDur(pr.remDur);
+    $("navTxt").textContent = !n ? "Следвайте маршрута" : n.type === "arrive" ? "Към " + dest.name : n.text;
+    $("navLeft").textContent = fmtDur(pr.remDur);
+    $("navEta").textContent = NC.distText(pr.remaining) + " · пристигане " + clock(pr.remDur);
   }
 
   // ---------- задържане върху картата ----------
   function onLongPress(p) {
     var nm = p[0].toFixed(5) + ", " + p[1].toFixed(5);
     preview({ p: p, name: nm });
-    fetch(PHOTON + "reverse?lat=" + p[0] + "&lon=" + p[1], { signal: AbortSignal.timeout(8000) }).then(function (r) { return r.json(); }).then(function (j) {
+    fetch(PHOTON + "reverse?lang=default&lat=" + p[0] + "&lon=" + p[1], { signal: AbortSignal.timeout(8000) }).then(function (r) { return r.json(); }).then(function (j) {
       var f = j.features && j.features[0]; if (!f || !dest || dest.p !== p) return;
-      var l = label(f); dest.name = l.main;
+      var l = label(f), t = townOf(f.properties); dest.name = l.main + (t && l.kind !== "place" ? ", " + t : "");
       var b = $("prevBody").querySelector("b"); if (b) b.textContent = dest.name;
     }).catch(function () { });
   }
@@ -185,6 +254,11 @@
     qTimer = setTimeout(function () { search(q); }, 350);
   };
   $("q").onkeydown = function (e) { if (e.key === "Enter") { clearTimeout(qTimer); search(this.value.trim()); } };
+  $("tabFree").onclick = function () { setMode("free"); };
+  $("tabAddr").onclick = function () { setMode("addr"); };
+  $("fCity").oninput = cityInput; $("fStreet").oninput = streetInput;
+  $("fNum").onkeydown = function (e) { if (e.key === "Enter") findAddress(); };
+  $("fGo").onclick = findAddress;
   $("goNav").onclick = start;
   $("cancelNav").onclick = cancel;
   $("endNav").onclick = function () { cancel(); App.say("Навигацията е спряна."); };

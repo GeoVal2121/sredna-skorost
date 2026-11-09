@@ -118,6 +118,14 @@ button:disabled{opacity:.5}
 .sg .ico{width:32px;height:32px;border-radius:50%;background:#f1f4f8;display:grid;place-items:center;color:var(--mut);flex:none}
 .sg b{display:block;font-weight:600}.sg small{color:var(--mut)}
 .sg.none{cursor:default}
+.aform{flex:1;display:flex;flex-direction:column;gap:8px}
+.aform input{font:inherit;font-size:16px;border:0;outline:0;background:#f1f4f8;border-radius:12px;padding:10px 14px;width:100%}
+.arow{display:flex;gap:8px}.arow input{flex:1;min-width:0}
+.srow .arow button{flex:none;padding:10px 16px;font-size:15px;border-radius:12px;background:#1a73e8;color:#fff;font-weight:600}
+.tabs{display:flex;gap:6px;padding:8px 10px;border-bottom:1px solid var(--line)}
+.tabs button{flex:1;padding:8px;font-size:14px;border-radius:20px;background:#f1f4f8;border:0;color:var(--mut)}
+.tabs button.on{background:#e8f0fe;color:#1a73e8;font-weight:600}
+.nleft{font-size:22px;margin-right:10px}
 .intro p b{color:var(--tx)}
 </style>
 </head>
@@ -127,7 +135,7 @@ button:disabled{opacity:.5}
 <div class="top">
   <div class="navb" id="navb" hidden>
     <div class="nrow"><div class="nico" id="navIco"></div><div class="ntx"><b id="navDist"></b><span id="navTxt"></span></div></div>
-    <div class="neta"><span id="navEta"></span><button id="endNav">Край</button></div>
+    <div class="neta"><span><b class="nleft" id="navLeft"></b><span id="navEta"></span></span><button id="endNav">Край</button></div>
   </div>
   <button class="searchBtn" id="searchBtn"><svg viewBox="0 0 24 24" width="20" height="20"><circle cx="10" cy="10" r="6.5" fill="none" stroke="#5f6b7a" stroke-width="2.2"/><path d="M15 15 L21 21" stroke="#5f6b7a" stroke-width="2.4" stroke-linecap="round"/></svg>Накъде?</button>
   <div class="card" id="idle"><div id="nearest" class="mut">Натисни „Старт“, за да започне следенето.</div></div>
@@ -166,7 +174,14 @@ button:disabled{opacity:.5}
 </div>
 
 <div class="srch" id="srch">
-  <div class="srow"><button id="srchClose" aria-label="Назад">←</button><input id="q" type="search" placeholder="Търси адрес, град или обект" autocomplete="off" enterkeyhint="search"></div>
+  <div class="srow"><button id="srchClose" aria-label="Назад">←</button><input id="q" type="search" placeholder="Търси адрес, град или обект" autocomplete="off" enterkeyhint="search">
+    <div class="aform" id="addrForm" hidden>
+      <input id="fCity" placeholder="Град или село" autocomplete="off">
+      <input id="fStreet" placeholder="Улица, булевард или площад" autocomplete="off">
+      <div class="arow"><input id="fNum" placeholder="Номер" autocomplete="off" enterkeyhint="search"><button id="fGo" class="primary">Намери адреса</button></div>
+    </div>
+  </div>
+  <div class="tabs"><button id="tabFree" class="on">Търсене</button><button id="tabAddr">Град, улица, номер</button></div>
   <div id="sug"></div>
 </div>
 

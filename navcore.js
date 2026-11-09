@@ -86,7 +86,15 @@
     var next = null;
     for (var i = 0; i < route.steps.length; i++) { var s = route.steps[i]; if (s.d > pr.d + 3 && s.type !== "depart" && (s.important || s.type === "arrive")) { next = s; next.idx = i; break; } }
     var remaining = Math.max(route.total - pr.d, 0);
-    var remDur = route.total ? route.duration * remaining / route.total : 0;
+    // оставащо време по стъпките на OSRM (различна скорост по различните пътища)
+    var remDur = 0, st = route.steps;
+    for (var j = 0; j < st.length; j++) {
+      var s0 = st[j], s1 = st[j + 1], end = s1 ? s1.d : route.total;
+      if (end <= pr.d) continue;
+      var len = Math.max(end - s0.d, 1), part = Math.min(1, (end - Math.max(pr.d, s0.d)) / len);
+      remDur += (s0.duration || 0) * part;
+    }
+    if (!remDur && route.total) remDur = route.duration * remaining / route.total;
     return { along: pr.d, off: pr.e, snapped: pr.q, idx: pr.i, next: next, toNext: next ? next.d - pr.d : remaining, remaining: remaining, remDur: remDur };
   }
 
@@ -116,6 +124,47 @@
     return out.sort(function (x, y) { return x.d - y.d; });
   }
 
-  var api = { buildRoute: buildRoute, progress: progress, instruction: instruction, distText: distText, distSpeech: distSpeech, sectionsOnRoute: sectionsOnRoute, project: project, cum: cum };
+  // ---------- имена на места и адреси ----------
+  var Q = function (s) { return s; };
+  function street(name, kind) {
+    if (!name) return "";
+    var n = name.replace(/^улица\s+/i, "ул. ").replace(/^булевард\s+/i, "бул. ").replace(/^площад\s+/i, "пл. ").replace(/^ул\.(?=\S)/, "ул. ").replace(/^бул\.(?=\S)/, "бул. ");
+    if (/^(ул|бул|пл|кв|ж\.к|жк)\.?\s/i.test(n)) return n;
+    if (kind === "square") return "пл. " + n;
+    if (/^(residential|living_street|tertiary|secondary|unclassified|service|pedestrian|road)$/.test(kind || "")) return "ул. " + n;
+    return n;
+  }
+  function settlement(name, kind) {
+    if (!name) return "";
+    if (/^(гр|с|кв|ж\.к)\.\s/.test(name)) return name;
+    var pre = { city: "гр. ", town: "гр. ", village: "с. ", hamlet: "с. ", suburb: "кв. ", quarter: "кв. ", neighbourhood: "кв. ", square: "пл. " }[kind];
+    return (pre || "") + name;
+  }
+  function region(st) { return st ? (/^област/i.test(st) ? st.replace(/^област\s+/i, "обл. ") : "обл. " + st) : ""; }
+  // Photon (lang=default → имената от OSM, на кирилица)
+  function fmtPhoton(p) {
+    var k = p.osm_key, v = p.osm_value, sofia = p.state === "София-град", town = p.city || p.town || p.village || (sofia ? "София" : "");
+    var where = [town && town !== p.name ? (sofia && town === "София" ? "гр. София" : town) : "", p.district || "", sofia ? "" : region(p.state)].filter(Boolean);
+    if (k === "place") {
+      return { main: settlement(p.name, v), sub: [{ city: "град", town: "град", village: "село", hamlet: "село", suburb: "квартал", quarter: "квартал", neighbourhood: "квартал", square: "площад" }[v] || "място"].concat(region(p.state) ? [region(p.state)] : []).join(" · "), kind: "place" };
+    }
+    if (p.housenumber && p.street) return { main: street(p.street, "residential") + " " + p.housenumber, sub: ["адрес"].concat(where).join(" · "), kind: "addr" };
+    if (k === "highway" || v === "square") {
+      return { main: street(p.name, v === "square" ? "square" : v), sub: [v === "square" || /^пл\./.test(street(p.name, v)) ? "площад" : /^бул\./.test(street(p.name, v)) ? "булевард" : "улица"].concat(where).join(" · "), kind: "street" };
+    }
+    var addr = p.street ? street(p.street, "residential") + (p.housenumber ? " " + p.housenumber : "") : "";
+    var cat = { peak: "връх", station: "гара", halt: "гара", aerodrome: "летище", bus_station: "автогара", fuel: "бензиностанция", hospital: "болница",
+      parking: "паркинг", hotel: "хотел", restaurant: "ресторант", supermarket: "магазин", mall: "мол", school: "училище", university: "университет" }[v] || "обект";
+    return { main: p.name || addr || town || "Точка", sub: [cat].concat([addr].filter(Boolean), where).join(" · "), kind: "poi" };
+  }
+  // Nominatim (addressdetails=1, accept-language=bg)
+  function fmtNominatim(it) {
+    var a = it.address || {}, town = a.city || a.town || a.village || a.hamlet || "", road = a.road || a.pedestrian || a.square || "";
+    var main = road ? street(road, a.square && !a.road ? "square" : "residential") + (a.house_number ? " " + a.house_number : "") : (it.name || town);
+    var sub = [a.house_number ? "адрес" : road ? "улица" : "място", town ? settlement(town, a.city ? "city" : a.town ? "town" : "village") : "", a.suburb || "", region(a.state)].filter(Boolean).join(" · ");
+    return { main: main, sub: sub, exact: !!a.house_number, p: [+it.lat, +it.lon] };
+  }
+
+  var api = { fmtPhoton: fmtPhoton, fmtNominatim: fmtNominatim, street: street, settlement: settlement, buildRoute: buildRoute, progress: progress, instruction: instruction, distText: distText, distSpeech: distSpeech, sectionsOnRoute: sectionsOnRoute, project: project, cum: cum };
   if (typeof module !== "undefined") module.exports = api; else root.SSNavCore = api;
 })(this);
