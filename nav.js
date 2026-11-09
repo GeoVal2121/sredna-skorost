@@ -11,6 +11,9 @@
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
   function here() { var t = App.tracker(); return t.last ? t.last.p : null; }
   function fmtDur(s) { var m = Math.round(s / 60); return m < 60 ? m + " мин" : Math.floor(m / 60) + " ч " + (m % 60) + " мин"; }
+  function durSpeech(s) { var m = Math.max(1, Math.round(s / 60)), h = Math.floor(m / 60), r = m % 60;
+    var mins = function (x) { return x === 1 ? "1 минута" : x + " минути"; };
+    return h ? (h === 1 ? "1 час" : h + " часа") + (r ? " и " + mins(r) : "") : mins(m); }
   function clock(s) { var d = new Date(Date.now() + s * 1000); return d.getHours() + ":" + String(d.getMinutes()).padStart(2, "0"); }
 
   // ---------- търсене ----------
@@ -92,8 +95,9 @@
     App.ensureRunning();
     SSMap.setRoute(route.line, false); SSMap.follow();
     var first = route.steps.filter(function (s) { return s.important; })[0];
-    App.say("Тръгваме. " + fmtDur(route.duration) + " до " + dest.name + ".", true);
-    if (first) App.say("След " + NC.distSpeech(first.d) + " " + first.text.toLowerCase() + ".");
+    if (first) said[route.steps.indexOf(first)] = { cont: 1 };
+    App.say("Тръгваме. " + durSpeech(route.duration) + " до " + dest.name + ".", true);
+    if (first) App.say("След " + NC.distSpeech(first.d) + " " + first.text.charAt(0).toLowerCase() + first.text.slice(1) + ".");
     update(null);
   }
   function reroute(p) {
@@ -119,11 +123,21 @@
     }
     // гласови указания: далечно и близко
     var n = pr.next;
-    if (n && n.type !== "arrive") {
-      var far = speed > 90 ? 1500 : speed > 50 ? 600 : 300, near = speed > 90 ? 450 : speed > 50 ? 180 : 80;
+    // гласови указания: рано, подготовка, сега; след завой — колко да продължи
+    var lc = function (t) { return t.charAt(0).toLowerCase() + t.slice(1); };
+    if (n) {
       var k = n.idx, s = said[k] || (said[k] = {});
-      if (!s.far && pr.toNext < far && pr.toNext > near * 1.6) { s.far = 1; App.say("След " + NC.distSpeech(pr.toNext) + " " + n.text.toLowerCase() + "."); }
-      if (!s.near && pr.toNext <= near) { s.near = 1; s.far = 1; App.say(n.text + ".", true); }
+      var early = speed > 90 ? 2000 : speed > 50 ? 1000 : 400, prep = speed > 90 ? 800 : speed > 50 ? 400 : 150, now = speed > 90 ? 350 : speed > 50 ? 150 : 40;
+      if (n.type === "arrive") {
+        if (!s.prep && pr.toNext < prep && pr.toNext > 60) { s.prep = 1; App.say("След " + NC.distSpeech(pr.toNext) + " ще пристигнете."); }
+      } else {
+        if (!s.cont && !s.early && pr.toNext > early * 1.5 && pr.toNext > 3000 && n.idx > 0) {
+          s.cont = 1; App.say("Продължете " + NC.distSpeech(pr.toNext) + " до следващия завой.");
+        }
+        if (!s.early && pr.toNext < early && pr.toNext > prep * 1.3) { s.early = 1; App.say("След " + NC.distSpeech(pr.toNext) + " " + lc(n.text) + "."); }
+        if (!s.prep && pr.toNext < prep && pr.toNext > now * 1.3) { s.prep = s.early = 1; App.say("След " + NC.distSpeech(pr.toNext) + " " + lc(n.text) + "."); }
+        if (!s.now && pr.toNext <= now) { s.now = s.prep = s.early = 1; App.say("Сега " + lc(n.text) + ".", true); }
+      }
     }
     lastPr = pr; update(pr);
     return pr.off < 35 ? pr.snapped : null;

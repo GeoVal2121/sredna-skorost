@@ -47,7 +47,9 @@ button:active{transform:scale(.97)}
   box-shadow:0 3px 12px #0005;border:4px solid #fff;transition:background .3s,color .3s}
 .spd b{font-size:38px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
 .spd span{font-size:11px;color:#555}
-.spd.over{background:var(--bad);border-color:#fff;color:#fff}.spd.over span{color:#fff}
+.spd.over{background:var(--bad);border-color:#fff;color:#fff;animation:glow 1.2s ease-in-out infinite}.spd.over span{color:#fff}
+.spd.fast{border-color:var(--warn)}
+@keyframes glow{0%,100%{box-shadow:0 0 0 0 #d9302599,0 3px 12px #0005}50%{box-shadow:0 0 0 14px #d9302500,0 0 28px 8px #d93025cc}}
 /* дясна колона */
 .side{position:fixed;right:10px;bottom:calc(var(--sb) + 86px);z-index:3;display:flex;flex-direction:column;gap:8px}
 .side button{width:50px;height:50px;padding:0;border-radius:50%;font-size:20px;display:grid;place-items:center;background:var(--panel);box-shadow:0 2px 8px #0003}
@@ -174,6 +176,8 @@ button:disabled{opacity:.5}
     <select id="margin"><option value="0">0 км/ч</option><option value="3">3 км/ч</option><option value="5">5 км/ч</option><option value="10">10 км/ч</option></select></div>
   <div class="row"><span>Картата по посоката на движение</span><input type="checkbox" id="headUp"></div>
   <div class="row"><span>Гласови съобщения</span><input type="checkbox" id="voice"></div>
+  <div class="row"><span>Глас</span><select id="voiceSel" style="max-width:60%"></select></div>
+  <p class="mut" id="voiceNote" hidden style="margin:8px 0;font-size:13px;color:var(--bad)">На телефона няма инсталиран български глас и указанията ще звучат неправилно. Android: Настройки → Достъпност (или Система) → Преобразуване на текст в говор → Google → Инсталиране на гласови данни → Български. iPhone: Настройки → Достъпност → Изговорено съдържание → Гласове → Български.</p>
   <div class="row"><span>Звуков сигнал при превишаване</span><input type="checkbox" id="beep"></div>
   <div class="btns">
     <button id="osmBtn">Обнови рамките от OSM</button>

@@ -130,9 +130,14 @@
         this.active = null;
       } else {
         var st = this.activeState(fix.t);
-        if (st.status === "over" && travKm > 1 && fix.t - this.lastOver > 45000) {
-          this.lastOver = fix.t;
+        // предупреждение веднага при превишаване, после на всеки 60 сек.; съобщение при връщане под лимита
+        var isOver = st.status === "over" && travKm > 0.5;
+        if (isOver && (!a.over || fix.t - this.lastOver > 60000)) {
+          this.lastOver = fix.t; a.over = true;
           ev.push({ type: "over", sec: s, avg: st.avg, rec: st.rec });
+        } else if (!isOver && a.over && st.avg != null && st.avg <= s.limit) {
+          a.over = false;
+          ev.push({ type: "back", sec: s, avg: st.avg });
         }
       }
     }

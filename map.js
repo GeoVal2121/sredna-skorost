@@ -154,7 +154,7 @@
     if (map.getZoom() < 12) { map.jumpTo({ center: [lastP[1], lastP[0]], zoom: 15 }); dur = 0; }
     var opt = { center: [lastP[1], lastP[0]], duration: dur,
       bearing: up ? (moving ? heading : map.getBearing()) : 0, pitch: up ? 50 : 0,
-      padding: { top: 120, bottom: 220, left: 0, right: 0 } };
+      padding: { top: Math.round(map.getCanvas().clientHeight * 0.5), bottom: 100, left: 0, right: 0 } }; // стрелката в долната трета
     // при навигация мащабът следва скоростта (докато не е пипан ръчно)
     if (window.SSNav && SSNav.active() && now > userZoomUntil) {
       var v = App.tracker().speed; opt.zoom = v > 90 ? 15 : v > 50 ? 16 : 17;

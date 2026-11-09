@@ -29,10 +29,31 @@
 
   // ---------- звук и глас ----------
   var ac = null;
+  var primed = false;
   function unlockAudio() {
     try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); ac.resume(); } catch (e) { }
-    try { speechSynthesis.getVoices(); } catch (e) { }
+    // iOS/Android пускат гласа само ако първото изговаряне е при докосване
+    try { if (!primed && window.speechSynthesis) { primed = true; var u = new SpeechSynthesisUtterance(" "); u.volume = 0; u.lang = "bg-BG"; speechSynthesis.speak(u); } } catch (e) { }
+    loadVoices();
   }
+  // ---------- гласове ----------
+  var voices = [];
+  function loadVoices() {
+    if (!window.speechSynthesis) return;
+    try { voices = speechSynthesis.getVoices() || []; } catch (e) { voices = []; }
+    var sel = $("voiceSel"); if (!sel) return;
+    var bg = voices.filter(function (v) { return /^bg/i.test(v.lang); }), others = voices.filter(function (v) { return !/^bg/i.test(v.lang); });
+    sel.innerHTML = (bg.length ? "" : "<option value=''>Няма български глас</option>") +
+      bg.concat(others.slice(0, 40)).map(function (v) { return "<option value='" + v.name.replace(/'/g, "&#39;") + "'>" + v.name + " (" + v.lang + ")</option>"; }).join("");
+    var cur = pickVoice(); if (cur) sel.value = cur.name;
+    $("voiceNote").hidden = bg.length > 0;
+  }
+  function pickVoice() {
+    var bg = voices.filter(function (v) { return /^bg/i.test(v.lang); });
+    var chosen = cfg.voiceName && voices.filter(function (v) { return v.name === cfg.voiceName; })[0];
+    return chosen || bg.filter(function (v) { return v.localService; })[0] || bg[0] || null;
+  }
+  if (window.speechSynthesis) try { speechSynthesis.onvoiceschanged = loadVoices; } catch (e) { }
   function beep(n) {
     if (!cfg.beep || !ac) return;
     for (var i = 0; i < (n || 2); i++) {
@@ -46,10 +67,11 @@
     if (!cfg.voice || !window.speechSynthesis) return;
     try {
       if (urgent) speechSynthesis.cancel();
-      var u = new SpeechSynthesisUtterance(text);
-      u.lang = "bg-BG"; u.rate = 1.05;
-      var v = speechSynthesis.getVoices().filter(function (x) { return /^bg/i.test(x.lang); })[0];
+      if (!voices.length) loadVoices();
+      var u = new SpeechSynthesisUtterance(text), v = pickVoice();
+      u.lang = v ? v.lang : "bg-BG"; u.rate = 1.0;
       if (v) u.voice = v;
+      if (speechSynthesis.paused) speechSynthesis.resume();
       speechSynthesis.speak(u);
     } catch (e) { }
   }
@@ -64,16 +86,19 @@
   function onEvent(e) {
     var s = e.sec, nm = s ? s.from + " – " + s.to : "";
     if (e.type === "approach") {
-      say((e.approx ? "Наближаваш" : "След " + kmText(e.dist) + ",") + " отсечка за средна скорост " + nm + ". Ограничение " + s.limit + (s.upcoming ? ". Отсечката още не е въведена." : "."));
+      say("Внимание, " + (e.approx ? "наближавате" : "след " + kmText(e.dist) + " навлизате в") + " зона за средна скорост " + nm + ". Ограничение " + s.limit + (s.upcoming ? ". Зоната още не е въведена." : "."));
     } else if (e.type === "enter") {
       $("res").hidden = true;
-      say("Начало на отсечка " + nm + ", " + String(Math.round(s.L * 10) / 10).replace(".", ",") + " километра, ограничение " + s.limit + ".", true);
+      say("Навлизате в зона за средна скорост " + nm + ". Дължина " + String(Math.round(s.L * 10) / 10).replace(".", ",") + " километра, ограничение " + s.limit + ".", true);
     } else if (e.type === "over") {
       beep(3);
-      say("Внимание. Средната скорост е " + r0(e.avg) + ". Карай най-много " + r0(e.rec) + ".", true);
+      say("Превишавате средната скорост. Средна " + r0(e.avg) + " при ограничение " + s.limit + "." +
+        (e.rec != null && e.rec >= 50 ? " Намалете до " + r0(e.rec) + "." : " До края на зоната вече не може да се компенсира."), true);
+    } else if (e.type === "back") {
+      say("Средната скорост вече е под ограничението.");
     } else if (e.type === "finish") {
       if (e.over) beep(2);
-      say("Край на отсечката. Средна скорост " + r0(e.avg) + (e.over ? ", над ограничението." : "."), true);
+      say("Напускате зоната за средна скорост. Вашата средна скорост е " + r0(e.avg) + (e.over ? ", над ограничението " + s.limit + "." : ", в рамките на ограничението."), true);
       var res = $("res");
       res.hidden = false; res.className = "card result" + (e.over ? " over" : "");
       res.innerHTML = "<h2>Последна отсечка</h2><div class='sec-name'><div><small>" + s.roadName + "</small>" + nm +
@@ -81,8 +106,8 @@
         r0(e.avg) + " км/ч</b> <span class='mut'>(ограничение " + s.limit + ", " + r0(e.minutes) + " мин.)</span></p>";
       store.set("last", { name: nm, road: s.roadName, avg: e.avg, limit: s.limit, t: Date.now() });
     } else if (e.type === "abort") {
-      say("Излезе от отсечката " + nm + ".");
-      toast("Излезе от отсечката " + nm);
+      say("Напускате зоната за средна скорост " + nm + ".");
+      toast("Излязохте от отсечката " + nm);
     }
   }
 
@@ -173,7 +198,9 @@
     $("spd").textContent = tracker.last ? r0(tracker.speed) : "–";
     var st = tracker.activeState(t);
     $("act").hidden = !st; $("idle").hidden = !!st;
-    $("spdBox").classList.toggle("over", !!st && tracker.speed > st.sec.limit);
+    // километражът свети в червено, когато средната в зоната е над лимита; оранжев кант при текуща скорост над лимита
+    $("spdBox").classList.toggle("over", !!st && st.status === "over");
+    $("spdBox").classList.toggle("fast", !!st && st.status !== "over" && tracker.speed > st.sec.limit);
     if (st) {
       var s = st.sec;
       $("aRoad").textContent = s.roadName + (s.upcoming ? " · предстояща" : "");
@@ -183,7 +210,7 @@
       $("aAvg").textContent = st.avg == null ? "–" : r0(st.avg);
       $("aAvgCell").className = "cell big " + st.status;
       $("act").className = "card" + (st.status === "over" ? " over" : "");
-      $("aRec").textContent = st.rec == null ? "–" : r0(st.rec);
+      $("aRec").textContent = st.rec == null || st.rec < 50 ? "–" : r0(st.rec);
       $("aRem").textContent = st.remaining.toFixed(1).replace(".", ",");
       $("aPred").textContent = r0(st.predicted);
       $("aTime").textContent = fmtMin(st.elapsedMin);
@@ -272,7 +299,9 @@
   $("osmBtn").onclick = function () { loadOsm(true); };
   $("clrBtn").onclick = function () { dialog("Изтриване на калибрациите", "Ще бъдат изтрити " + Object.keys(manual).length + " ръчно записани рамки.", function () { manual = {}; store.set("manual", manual); rebuild(); }); };
   $("demoBtn").onclick = function () { $("sheet").classList.remove("show"); demo(); };
-  $("testVoice").onclick = function () { unlockAudio(); beep(1); say("Начало на отсечка Чирпан – Памукчии, ограничение 140."); };
+  $("testVoice").onclick = function () { unlockAudio(); beep(1); say("След 500 метра завийте надясно. Начало на отсечка Чирпан – Памукчии, ограничение 140.", true); };
+  $("voiceSel").onchange = function () { cfg.voiceName = this.value || null; store.set("cfg", cfg); say("Здравейте. Това е гласът за навигация.", true); };
+  loadVoices();
   if (store.get("intro", 0)) $("intro").classList.remove("show");
 
   window.SSApp = { model: function () { return model; }, tracker: function () { return tracker; }, cfg: cfg, toast: toast, say: say,
