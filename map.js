@@ -52,14 +52,17 @@
       map.addSource("pts", { type: "geojson", data: pointsGeo() });
       map.addSource("trk", { type: "geojson", data: trackGeo() });
       map.addSource("route", { type: "geojson", data: routeGeo() });
-      map.addLayer({ id: "route-case", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" },
+      // линиите под надписите и номерата на пътищата от картата
+      var sym = (map.getStyle().layers || []).filter(function (l) { return l.type === "symbol"; })[0], below = sym ? sym.id : undefined;
+      var addBelow = function (l) { map.addLayer(l, below); };
+      addBelow({ id: "route-case", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" },
         paint: { "line-color": "#1557b0", "line-width": 11, "line-opacity": 0.9 } });
-      map.addLayer({ id: "route", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" },
+      addBelow({ id: "route", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" },
         paint: { "line-color": "#4b8ef5", "line-width": 7 } });
-      map.addLayer({ id: "secs", type: "line", source: "secs", layout: { "line-cap": "round" },
+      addBelow({ id: "secs", type: "line", source: "secs", layout: { "line-cap": "round" },
         paint: { "line-color": ["case", ["==", ["get", "act"], 1], "#d93025", ["==", ["get", "up"], 1], "#a08a5a", "#e8710a"],
           "line-width": ["case", ["==", ["get", "act"], 1], 8, 6], "line-opacity": 0.75 } });
-      map.addLayer({ id: "trk", type: "line", source: "trk", layout: { "line-cap": "round", "line-join": "round" },
+      addBelow({ id: "trk", type: "line", source: "trk", layout: { "line-cap": "round", "line-join": "round" },
         paint: { "line-color": "#4285f4", "line-width": 5, "line-opacity": 0.7 } });
       map.addLayer({ id: "pts", type: "circle", source: "pts",
         paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 4, 12, 8, 16, 11], "circle-color": ["get", "col"],
@@ -106,7 +109,7 @@
     map.on("contextmenu", function (e) { longPress([e.point.x, e.point.y]); });
     carEl = document.createElement("div");
     carEl.className = "car";
-    carEl.innerHTML = '<svg viewBox="0 0 48 48" width="48" height="48"><defs><filter id="sh" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="1.5" stdDeviation="1.8" flood-color="#000" flood-opacity=".55"/></filter></defs><path d="M24 5 L39 40 L24 32 L9 40 Z" fill="#1a73e8" stroke="#fff" stroke-width="3.5" stroke-linejoin="round" filter="url(#sh)"/></svg>';
+    carEl.innerHTML = '<svg viewBox="0 0 64 64" width="64" height="64"><defs><radialGradient id="carsh"><stop offset="0" stop-color="#000" stop-opacity=".45"/><stop offset=".55" stop-color="#000" stop-opacity=".18"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient><filter id="sh" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity=".5"/></filter></defs><circle cx="32" cy="34" r="24" fill="url(#carsh)"/><path d="M32 13 L47 48 L32 40 L17 48 Z" fill="#1a73e8" stroke="#fff" stroke-width="3.5" stroke-linejoin="round" filter="url(#sh)"/></svg>';
     $("center").onclick = function () { setFollow(true); recenter(); };
   }
 
@@ -127,6 +130,34 @@
     return (Math.atan2(y, x) / r + 360) % 360;
   }
 
+  // ---------- плавно движение: стрелката и камерата се интерполират между GPS точките ----------
+  var anim = { from: null, to: null, h0: 0, h1: 0, t0: 0, dur: 1000, lastFix: 0 }, raf = null, camBearing = null, easing = false;
+  function lerpAngle(a, b, t) { var d = ((b - a + 540) % 360) - 180; return (a + d * t + 360) % 360; }
+  function animPos(now) {
+    var t = Math.min(1, (now - anim.t0) / anim.dur), f = anim.from, g = anim.to;
+    return { p: [f[0] + (g[0] - f[0]) * t, f[1] + (g[1] - f[1]) * t], h: lerpAngle(anim.h0, anim.h1, t), t: t };
+  }
+  function pad() { return { top: Math.round(map.getCanvas().clientHeight * 0.5), bottom: 100, left: 0, right: 0 }; } // стрелката в долната трета
+  function frame() {
+    raf = null; if (!anim.to) return;
+    var now = performance.now(), c = animPos(now);
+    car.setLngLat([c.p[1], c.p[0]]).setRotation(c.h);
+    if (follow && !touching && !easing) {
+      var up = App.cfg.headUp, moving = App.tracker().speed > 8;
+      if (camBearing == null) camBearing = map.getBearing();
+      camBearing = up ? (moving ? lerpAngle(camBearing, c.h, 0.12) : camBearing) : lerpAngle(camBearing, 0, 0.12);
+      var opt = { center: [c.p[1], c.p[0]], bearing: camBearing, pitch: map.getPitch() + ((up ? 50 : 0) - map.getPitch()) * 0.1, padding: pad() };
+      var z = map.getZoom();
+      if (z < 12) opt.zoom = 15;
+      else if (window.SSNav && SSNav.active() && Date.now() > userZoomUntil) {
+        var v = App.tracker().speed, tz = v > 90 ? 15 : v > 50 ? 16 : 17; opt.zoom = z + (tz - z) * 0.03;
+      }
+      map.jumpTo(opt);
+    }
+    // анимира докато има движение; спира, ако GPS мълчи над 3 сек.
+    if (c.t < 1 || (follow && now - anim.lastFix < 3000)) raf = requestAnimationFrame(frame);
+  }
+
   function onFix(fix, snap) {
     if (!map) return;
     var p = snap || [fix.lat, fix.lon];
@@ -137,32 +168,24 @@
     // следа само от точни позиции (или прилепени към маршрута)
     if (moved && (snap || !fix.acc || fix.acc <= 25)) { track.push([p[1], p[0]]); if (track.length > 6000) track.shift(); }
     if (!car) car = new maplibregl.Marker({ element: carEl, rotationAlignment: "map", pitchAlignment: "viewport" }).setLngLat([p[1], p[0]]).addTo(map);
-    car.setLngLat([p[1], p[0]]).setRotation(heading);
+    var now = performance.now(), cur = anim.to ? animPos(now) : { p: p, h: heading };
+    if (anim.to && SSCore.dist(cur.p, p) > 2000) cur = { p: p, h: heading }; // голям скок (демо, нов маршрут) — без анимация
+    anim.from = cur.p; anim.h0 = cur.h; anim.to = p; anim.h1 = heading; anim.t0 = now;
+    anim.dur = Math.max(40, Math.min(1500, anim.lastFix ? now - anim.lastFix : 1000)); anim.lastFix = now;
+    if (!raf) raf = requestAnimationFrame(frame);
     if (ready) {
       map.getSource("trk").setData(trackGeo());
       var st = App.tracker().active, id = st ? st.sec.id : null;
       if (id !== lastActiveId) { lastActiveId = id; map.getSource("secs").setData(sectionsGeo(id)); }
     }
-    if (follow && !touching) recenter(true);
   }
 
-  function recenter(soft) {
-    if (!map || !lastP) return;
-    var up = App.cfg.headUp, moving = App.tracker().speed > 8;
-    var now = Date.now(), dur = soft ? Math.min(900, (now - (recenter.t || 0)) * 0.9) : 600;
-    recenter.t = now;
-    if (map.getZoom() < 12) { map.jumpTo({ center: [lastP[1], lastP[0]], zoom: 15 }); dur = 0; }
-    var opt = { center: [lastP[1], lastP[0]], duration: dur,
-      bearing: up ? (moving ? heading : map.getBearing()) : 0, pitch: up ? 50 : 0,
-      padding: { top: Math.round(map.getCanvas().clientHeight * 0.5), bottom: 100, left: 0, right: 0 } }; // стрелката в долната трета
-    // при навигация мащабът следва скоростта (докато не е пипан ръчно)
-    if (window.SSNav && SSNav.active() && now > userZoomUntil) {
-      var v = App.tracker().speed; opt.zoom = v > 90 ? 15 : v > 50 ? 16 : 17;
-    }
-    // ако стрелката е излязла от екрана, скок без анимация
-    var pt = map.project([lastP[1], lastP[0]]), cv = map.getCanvas();
-    if (pt.x < 0 || pt.y < 0 || pt.x > cv.clientWidth || pt.y > cv.clientHeight) opt.duration = 0;
-    map.easeTo(opt);
+  function recenter() {
+    if (!map || !anim.to) return;
+    var c = animPos(performance.now()), up = App.cfg.headUp;
+    camBearing = up ? c.h : 0; easing = true;
+    map.easeTo({ center: [c.p[1], c.p[0]], bearing: camBearing, pitch: up ? 50 : 0, zoom: Math.max(map.getZoom(), 15), padding: pad(), duration: 600 });
+    map.once("moveend", function () { easing = false; if (!raf) raf = requestAnimationFrame(frame); });
   }
 
   function refresh() {
@@ -170,7 +193,7 @@
     map.getSource("pts").setData(pointsGeo());
     map.getSource("secs").setData(sectionsGeo(lastActiveId));
   }
-  function resetTrack() { track = []; lastP = null; if (ready) map.getSource("trk").setData(trackGeo()); setFollow(true); }
+  function resetTrack() { track = []; lastP = null; anim.to = null; anim.lastFix = 0; if (ready) map.getSource("trk").setData(trackGeo()); setFollow(true); }
 
   function setRoute(line, fit) {
     routeLine = line; if (ready) map.getSource("route").setData(routeGeo());
