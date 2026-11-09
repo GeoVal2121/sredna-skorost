@@ -2,6 +2,13 @@
 (function (root) {
   "use strict";
   var dist = (typeof SSCore !== "undefined" ? SSCore : require("./core.js")).dist;
+  var TOWNS = {}; ((typeof SS_TOWNS !== "undefined" ? SS_TOWNS : (typeof require !== "undefined" ? require("./towns.js") : [])) || []).forEach(function (n) { TOWNS[n] = 1; });
+  // „гр.“ за градовете по ЕКАТТЕ, „с.“ за останалите населени места в България
+  function townLabel(town, p) {
+    if (!town) return "";
+    if (p && p.countrycode && p.countrycode !== "BG") return town;
+    return (TOWNS[town] ? "гр. " : "с. ") + town;
+  }
   var rad = function (x) { return x * Math.PI / 180; };
 
   function cum(line) { var c = [0]; for (var i = 1; i < line.length; i++) c.push(c[i - 1] + dist(line[i - 1], line[i])); return c; }
@@ -142,29 +149,45 @@
   }
   function region(st) { return st ? (/^област/i.test(st) ? st.replace(/^област\s+/i, "обл. ") : "обл. " + st) : ""; }
   // Photon (lang=default → имената от OSM, на кирилица)
+  // Град първо, после бул./ул./пл. и номер: „гр. Пловдив, бул. „България“ 12“
+  function cityFirst(town, line) { return [town, line].filter(Boolean).join(", "); }
   function fmtPhoton(p) {
     var k = p.osm_key, v = p.osm_value, sofia = p.state === "София-град", town = p.city || p.town || p.village || (sofia ? "София" : "");
-    var where = [town && town !== p.name ? (sofia && town === "София" ? "гр. София" : town) : "", p.district || "", sofia ? "" : region(p.state)].filter(Boolean);
+    var townL = townLabel(town, p), reg = sofia ? "" : region(p.state);
+    var where = [p.district || "", reg].filter(Boolean);
     if (k === "place") {
-      return { main: settlement(p.name, v), sub: [{ city: "град", town: "град", village: "село", hamlet: "село", suburb: "квартал", quarter: "квартал", neighbourhood: "квартал", square: "площад" }[v] || "място"].concat(region(p.state) ? [region(p.state)] : []).join(" · "), kind: "place" };
+      var typ = { city: "град", town: "град", village: "село", hamlet: "село", suburb: "квартал", quarter: "квартал", neighbourhood: "квартал", square: "площад" }[v] || "място";
+      var nm = settlement(p.name, v);
+      return { main: (v === "square" || typ === "квартал") && townL && town !== p.name ? cityFirst(townL, nm) : nm, sub: [typ].concat(reg ? [reg] : []).join(" · "),
+        kind: v === "square" ? "street" : "place", rank: v === "city" || v === "town" ? 0 : v === "square" ? 3 : 0.5, town: townL, line: nm };
     }
-    if (p.housenumber && p.street) return { main: street(p.street, "residential") + " " + p.housenumber, sub: ["адрес"].concat(where).join(" · "), kind: "addr" };
+    if (p.housenumber && p.street) {
+      var ln = street(p.street, "residential") + " " + p.housenumber;
+      return { main: cityFirst(townL, ln), sub: ["адрес"].concat(where).join(" · "), kind: "addr", rank: 4, town: townL, line: ln };
+    }
     if (k === "highway" || v === "square") {
-      return { main: street(p.name, v === "square" ? "square" : v), sub: [v === "square" || /^пл\./.test(street(p.name, v)) ? "площад" : /^бул\./.test(street(p.name, v)) ? "булевард" : "улица"].concat(where).join(" · "), kind: "street" };
+      var st = street(p.name, v === "square" ? "square" : v), t2 = /^пл\./.test(st) ? "площад" : /^бул\./.test(st) ? "булевард" : "улица";
+      return { main: cityFirst(townL, st), sub: [t2].concat(where).join(" · "), kind: "street", rank: t2 === "булевард" ? 1 : t2 === "улица" ? 2 : 3, town: townL, line: st };
     }
     var addr = p.street ? street(p.street, "residential") + (p.housenumber ? " " + p.housenumber : "") : "";
     var cat = { peak: "връх", station: "гара", halt: "гара", aerodrome: "летище", bus_station: "автогара", fuel: "бензиностанция", hospital: "болница",
       parking: "паркинг", hotel: "хотел", restaurant: "ресторант", supermarket: "магазин", mall: "мол", school: "училище", university: "университет" }[v] || "обект";
-    return { main: p.name || addr || town || "Точка", sub: [cat].concat([addr].filter(Boolean), where).join(" · "), kind: "poi" };
+    return { main: p.name || cityFirst(townL, addr) || townL || "Точка", sub: [cat, cityFirst(townL, addr)].filter(Boolean).concat(where).join(" · "), kind: "poi", rank: 5, town: townL, line: p.name || addr };
+  }
+  // ред в списъка: градове, села, булеварди, улици, площади, адреси с номер, обекти
+  function sortResults(items) {
+    return items.map(function (x, i) { return { x: x, i: i }; })
+      .sort(function (a, b) { return (a.x.rank - b.x.rank) || (a.i - b.i); }).map(function (o) { return o.x; });
   }
   // Nominatim (addressdetails=1, accept-language=bg)
   function fmtNominatim(it) {
     var a = it.address || {}, town = a.city || a.town || a.village || a.hamlet || "", road = a.road || a.pedestrian || a.square || "";
-    var main = road ? street(road, a.square && !a.road ? "square" : "residential") + (a.house_number ? " " + a.house_number : "") : (it.name || town);
-    var sub = [a.house_number ? "адрес" : road ? "улица" : "място", town ? settlement(town, a.city ? "city" : a.town ? "town" : "village") : "", a.suburb || "", region(a.state)].filter(Boolean).join(" · ");
-    return { main: main, sub: sub, exact: !!a.house_number, p: [+it.lat, +it.lon] };
+    var townL = town ? settlement(town, a.city ? "city" : a.town ? "town" : "village") : "";
+    var line = road ? street(road, a.square && !a.road ? "square" : "residential") + (a.house_number ? " " + a.house_number : "") : (it.name || "");
+    var sub = [a.house_number ? "адрес" : road ? "улица" : "място", a.suburb || "", region(a.state)].filter(Boolean).join(" · ");
+    return { main: cityFirst(townL, line) || townL, sub: sub, exact: !!a.house_number, p: [+it.lat, +it.lon], town: townL, line: line };
   }
 
-  var api = { fmtPhoton: fmtPhoton, fmtNominatim: fmtNominatim, street: street, settlement: settlement, buildRoute: buildRoute, progress: progress, instruction: instruction, distText: distText, distSpeech: distSpeech, sectionsOnRoute: sectionsOnRoute, project: project, cum: cum };
+  var api = { sortResults: sortResults, fmtPhoton: fmtPhoton, fmtNominatim: fmtNominatim, street: street, settlement: settlement, buildRoute: buildRoute, progress: progress, instruction: instruction, distText: distText, distSpeech: distSpeech, sectionsOnRoute: sectionsOnRoute, project: project, cum: cum };
   if (typeof module !== "undefined") module.exports = api; else root.SSNavCore = api;
 })(this);

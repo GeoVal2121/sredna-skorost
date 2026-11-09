@@ -43,10 +43,11 @@
       if (!rows.length) rows.push({ main: "Напиши адрес, град или обект", sub: "или задръж пръст върху картата", none: 1 });
     }
     var seen = {};
-    feats.filter(function (f) { return f.properties.osm_key !== "boundary"; }).forEach(function (f) {
-      var l = label(f), key = l.main + "|" + l.sub; if (seen[key]) return; seen[key] = 1;
-      var t = townOf(f.properties);
-      rows.push({ main: l.main, sub: l.sub, p: [f.geometry.coordinates[1], f.geometry.coordinates[0]], name: l.main + (t && l.kind !== "place" ? ", " + t : ""), ico: ICO[l.kind] }); });
+    var found = feats.filter(function (f) { return f.properties.osm_key !== "boundary"; }).map(function (f) {
+      var l = label(f); l.p = [f.geometry.coordinates[1], f.geometry.coordinates[0]]; return l; });
+    NC.sortResults(found).forEach(function (l) {
+      var key = l.main + "|" + l.sub; if (seen[key]) return; seen[key] = 1;
+      rows.push({ main: l.main, sub: l.sub, p: l.p, name: l.main, ico: ICO[l.kind] }); });
     if ($("q").value.trim() && !rows.length) rows.push({ main: "Няма резултати", sub: "Опитай с „Град, улица, номер“", none: 1 });
     renderRows(rows);
   }
@@ -70,8 +71,8 @@
     aTimer = setTimeout(function () {
       photon(q, ["place:city", "place:town", "place:village", "place:hamlet"], null, function (fs) {
         var seen = {};
-        renderRows(fs.map(function (f) { var l = label(f); return { main: l.main, sub: l.sub, p: [f.geometry.coordinates[1], f.geometry.coordinates[0]], ico: "◉",
-          raw: f.properties.name, key: l.main + l.sub }; }).filter(function (r) { if (seen[r.key]) return false; seen[r.key] = 1; return true; })
+        renderRows(NC.sortResults(fs.map(function (f) { var l = label(f); return { main: l.main, sub: l.sub, p: [f.geometry.coordinates[1], f.geometry.coordinates[0]], ico: "◉",
+          raw: f.properties.name, key: l.main + l.sub, rank: l.rank }; })).filter(function (r) { if (seen[r.key]) return false; seen[r.key] = 1; return true; })
           .map(function (r) { r.pick = function () { aCity = { name: r.raw, label: r.main, p: r.p }; $("fCity").value = r.main; renderRows([{ main: "Град: " + r.main, sub: "Сега въведи улица", none: 1 }]); $("fStreet").focus(); }; return r; }));
       });
     }, 300);
@@ -87,9 +88,10 @@
           var t = townOf(f.properties), c = [f.geometry.coordinates[1], f.geometry.coordinates[0]];
           var pr = f.properties, isSq = pr.osm_value === "square";
           return (pr.osm_key === "highway" || isSq) && (t === aCity.name || SSCore.dist(c, aCity.p) < 15000);
-        }).map(function (f) { var l = label(f); return { main: l.main, sub: l.sub, p: [f.geometry.coordinates[1], f.geometry.coordinates[0]], ico: "═", raw: f.properties.name }; })
+        }).map(function (f) { var l = label(f); return { main: aCity.label + ", " + l.line, sub: l.sub, p: [f.geometry.coordinates[1], f.geometry.coordinates[0]], ico: "═", raw: f.properties.name, line: l.line, rank: l.rank }; })
           .filter(function (r) { if (seen[r.main]) return false; seen[r.main] = 1; return true; })
-          .map(function (r) { r.pick = function () { aStreet = { name: r.raw, label: r.main, p: r.p }; $("fStreet").value = r.main; renderRows([{ main: r.main + ", " + aCity.label, sub: "Въведи номер или натисни „Намери адреса“", none: 1 }]); $("fNum").focus(); }; return r; });
+          .map(function (r) { r.pick = function () { aStreet = { name: r.raw, label: r.line, p: r.p }; $("fStreet").value = r.line; renderRows([{ main: aCity.label + ", " + r.line, sub: "Въведи номер или натисни „Намери адреса“", none: 1 }]); $("fNum").focus(); }; return r; });
+        rows = NC.sortResults(rows);
         renderRows(rows.length ? rows : [{ main: "Няма такава улица в " + aCity.label, sub: "Провери изписването", none: 1 }]);
       });
     }, 300);
@@ -103,17 +105,17 @@
       "&street=" + encodeURIComponent((num ? num + " " : "") + st) + "&city=" + encodeURIComponent(aCity.name);
     fetch(u, { signal: AbortSignal.timeout(12000) }).then(function (r) { return r.json(); }).then(function (list) {
       var seen = {};
-      var rows = (list || []).map(function (it) { var f = NC.fmtNominatim(it); return { main: f.main, sub: f.sub, p: f.p, name: f.main + ", " + aCity.label, ico: f.exact ? "№" : "═", exact: f.exact }; })
+      var rows = (list || []).map(function (it) { var f = NC.fmtNominatim(it); return { main: f.main, sub: f.sub, p: f.p, name: f.main, ico: f.exact ? "№" : "═", exact: f.exact }; })
         .filter(function (r) { var k = r.main + "|" + r.sub; if (seen[k]) return false; seen[k] = 1; return true; });
       var exact = rows.filter(function (r) { return r.exact; });
       if (num && exact.length === 1) { closeSearch(); preview({ p: exact[0].p, name: exact[0].name }); return; }
       if (num && !exact.length) {
         // номерът го няма в картата — предлага улицата
-        var fall = aStreet ? [{ main: aStreet.label, sub: "№ " + num + " не е отбелязан в картата · води до улицата", p: aStreet.p, name: aStreet.label + " " + num + ", " + aCity.label, ico: "═" }] : [];
-        var others = rows.filter(function (r) { return !aStreet || r.main !== aStreet.label || r.sub.indexOf(aCity.name) < 0; });
+        var fall = aStreet ? [{ main: aCity.label + ", " + aStreet.label, sub: "№ " + num + " не е отбелязан в картата · води до улицата", p: aStreet.p, name: aCity.label + ", " + aStreet.label + " " + num, ico: "═" }] : [];
+        var others = rows.filter(function (r) { return !aStreet || r.main.indexOf(aStreet.label) < 0; });
         renderRows(fall.concat(others).length ? fall.concat(others) : [{ main: "Не намерих адреса", sub: "Опитай без номер", none: 1 }]); return;
       }
-      if (!rows.length && aStreet) rows = [{ main: aStreet.label, sub: aCity.label, p: aStreet.p, name: aStreet.label + ", " + aCity.label, ico: "═" }];
+      if (!rows.length && aStreet) rows = [{ main: aCity.label + ", " + aStreet.label, sub: "улица", p: aStreet.p, name: aCity.label + ", " + aStreet.label, ico: "═" }];
       renderRows(rows.length ? rows : [{ main: "Не намерих адреса", sub: "Провери улицата", none: 1 }]);
     }).catch(function () { renderRows([{ main: "Търсенето на адрес не отговаря", sub: "Опитай пак след малко", none: 1 }]); });
   }
@@ -235,7 +237,7 @@
     preview({ p: p, name: nm });
     fetch(PHOTON + "reverse?lang=default&lat=" + p[0] + "&lon=" + p[1], { signal: AbortSignal.timeout(8000) }).then(function (r) { return r.json(); }).then(function (j) {
       var f = j.features && j.features[0]; if (!f || !dest || dest.p !== p) return;
-      var l = label(f), t = townOf(f.properties); dest.name = l.main + (t && l.kind !== "place" ? ", " + t : "");
+      var l = label(f); dest.name = l.main;
       var b = $("prevBody").querySelector("b"); if (b) b.textContent = dest.name;
     }).catch(function () { });
   }
