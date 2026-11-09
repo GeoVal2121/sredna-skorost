@@ -1,11 +1,22 @@
 (function () {
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
+  // ---------- нова версия: ако телефонът е запазил стара, презарежда се автоматично ----------
+  var APP_VERSION = "2026.11.09-1";
+  try {
+    fetch("version.json?t=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
+      if (j && j.v && j.v !== APP_VERSION && sessionStorage.getItem("ss_reload") !== j.v) {
+        sessionStorage.setItem("ss_reload", j.v);
+        location.replace(location.pathname + "?v=" + encodeURIComponent(j.v) + location.hash);
+      }
+    }).catch(function () { });
+  } catch (e) { }
   var store = {
     get: function (k, d) { try { var v = localStorage.getItem("ss_" + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
     set: function (k, v) { try { localStorage.setItem("ss_" + k, JSON.stringify(v)); } catch (e) { } }
   };
-  var cfg = Object.assign({ margin: 3, voice: true, beep: true, headUp: true }, store.get("cfg", {}));
+  var cfg = Object.assign({ margin: 3, voice: true, beep: true, headUp: true, cams: true }, store.get("cfg", {}));
+  var camWatch = new SSCore.CamWatch(window.SS_CAMS || []);
   var manual = store.get("manual", {});           // ръчни калибрации
   var osmCache = store.get("osm", null);          // { t, g:[[lat,lon]] }
   var model, tracker, watchId = null, wake = null, demoTimer = null, lastFix = null;
@@ -35,22 +46,26 @@
     // iOS/Android пускат гласа само ако първото изговаряне е при докосване
     try { if (!primed && window.speechSynthesis) { primed = true; var u = new SpeechSynthesisUtterance(" "); u.volume = 0; u.lang = "bg-BG"; speechSynthesis.speak(u); } } catch (e) { }
     loadVoices();
+    if (useBuiltin() && window.SSTTS) SSTTS.preload().catch(function () { });
   }
   // ---------- гласове ----------
+  // „builtin“ = вграденият български глас; използва се и когато телефонът няма български глас
+  function hasBg() { return voices.some(function (v) { return /^bg/i.test(v.lang); }); }
+  function useBuiltin() { return !!window.SSTTS && (cfg.voiceName === "builtin" || (!cfg.voiceName && !hasBg()) || !window.speechSynthesis); }
   var voices = [];
   function loadVoices() {
     if (!window.speechSynthesis) return;
     try { voices = speechSynthesis.getVoices() || []; } catch (e) { voices = []; }
     var sel = $("voiceSel"); if (!sel) return;
     var bg = voices.filter(function (v) { return /^bg/i.test(v.lang); }), others = voices.filter(function (v) { return !/^bg/i.test(v.lang); });
-    sel.innerHTML = (bg.length ? "" : "<option value=''>Няма български глас</option>") +
+    sel.innerHTML = (window.SSTTS ? "<option value='builtin'>Вграден български глас</option>" : bg.length ? "" : "<option value=''>Няма български глас</option>") +
       bg.concat(others.slice(0, 40)).map(function (v) { return "<option value='" + v.name.replace(/'/g, "&#39;") + "'>" + v.name + " (" + v.lang + ")</option>"; }).join("");
-    var cur = pickVoice(); if (cur) sel.value = cur.name;
+    var cur = pickVoice(); sel.value = useBuiltin() ? "builtin" : cur ? cur.name : "";
     $("voiceNote").hidden = bg.length > 0;
   }
   function pickVoice() {
     var bg = voices.filter(function (v) { return /^bg/i.test(v.lang); });
-    var chosen = cfg.voiceName && voices.filter(function (v) { return v.name === cfg.voiceName; })[0];
+    var chosen = cfg.voiceName && cfg.voiceName !== "builtin" && voices.filter(function (v) { return v.name === cfg.voiceName; })[0];
     return chosen || bg.filter(function (v) { return v.localService; })[0] || bg[0] || null;
   }
   if (window.speechSynthesis) try { speechSynthesis.onvoiceschanged = loadVoices; } catch (e) { }
@@ -64,7 +79,13 @@
     }
   }
   function say(text, urgent) {
-    if (!cfg.voice || !window.speechSynthesis) return;
+    if (!cfg.voice) return;
+    if (!voices.length) loadVoices();
+    if (useBuiltin() && window.SSTTS) {
+      SSTTS.speak(text, urgent, ac).catch(function () { toast("Вграденият глас не се зареди."); });
+      return;
+    }
+    if (!window.speechSynthesis) return;
     try {
       if (urgent) speechSynthesis.cancel();
       if (!voices.length) loadVoices();
@@ -111,11 +132,23 @@
     }
   }
 
+  // ---------- стационарни камери ----------
+  function onCam(e) {
+    var lim = e.cam[2];
+    if (e.type === "cam") {
+      say("Камера за скорост след " + kmText(Math.max(100, e.dist)) + "." + (lim ? " Ограничение " + lim + "." : ""));
+      toast("Камера за скорост" + (lim ? " · " + lim + " км/ч" : "") + " · " + e.cam[3]);
+    } else if (e.type === "camOver") {
+      beep(2); say("Намалете. Ограничение " + lim + ".", true);
+    }
+  }
+
   // ---------- позиция ----------
   function onFix(fix) {
     lastFix = fix;
     var evs = tracker.feed(fix);
     evs.forEach(onEvent);
+    if (cfg.cams) camWatch.feed({ p: [fix.lat, fix.lon], t: fix.t, speed: tracker.speed, heading: fix.heading }).forEach(onCam);
     render(fix.t);
     var snap = window.SSNav ? SSNav.onFix(fix) : null;
     if (window.SSMap) SSMap.onFix(fix, snap);
@@ -291,7 +324,8 @@
   $("setBtn").onclick = function () { $("sheet").classList.add("show"); };
   $("closeSet").onclick = function () { $("sheet").classList.remove("show"); };
   $("introOk").onclick = function () { $("intro").classList.remove("show"); store.set("intro", 1); unlockAudio(); };
-  $("margin").value = String(cfg.margin); $("voice").checked = cfg.voice; $("beep").checked = cfg.beep; $("headUp").checked = cfg.headUp;
+  $("margin").value = String(cfg.margin); $("voice").checked = cfg.voice; $("beep").checked = cfg.beep; $("headUp").checked = cfg.headUp; $("camsOn").checked = cfg.cams;
+  $("camsOn").onchange = function () { cfg.cams = this.checked; store.set("cfg", cfg); if (window.SSMap) SSMap.refresh(); };
   $("headUp").onchange = function () { cfg.headUp = this.checked; store.set("cfg", cfg); if (window.SSMap) SSMap.recenter(); };
   $("margin").onchange = function () { cfg.margin = +this.value; tracker.margin = cfg.margin; store.set("cfg", cfg); };
   $("voice").onchange = function () { cfg.voice = this.checked; store.set("cfg", cfg); };

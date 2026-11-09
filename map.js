@@ -31,6 +31,21 @@
     });
     return { type: "FeatureCollection", features: f };
   }
+  function camsGeo() {
+    var on = App.cfg.cams !== false;
+    return { type: "FeatureCollection", features: on ? (window.SS_CAMS || []).map(function (c) {
+      return { type: "Feature", geometry: { type: "Point", coordinates: [c[1], c[0]] }, properties: { lim: c[2] ? String(c[2]) : "", town: c[3], loc: c[4] } };
+    }) : [] };
+  }
+  function camIcon() { // тъмен квадрат с бяла камера, 2x
+    var cv = document.createElement("canvas"); cv.width = cv.height = 52; var g = cv.getContext("2d");
+    g.fillStyle = "#fff"; g.beginPath(); g.roundRect(2, 2, 48, 48, 12); g.fill();
+    g.fillStyle = "#3c4043"; g.beginPath(); g.roundRect(6, 6, 40, 40, 9); g.fill();
+    g.fillStyle = "#fff"; g.beginPath(); g.roundRect(12, 18, 22, 16, 3); g.fill();
+    g.beginPath(); g.moveTo(34, 23); g.lineTo(42, 18); g.lineTo(42, 34); g.lineTo(34, 29); g.closePath(); g.fill();
+    g.fillStyle = "#3c4043"; g.beginPath(); g.arc(20, 26, 4, 0, 7); g.fill();
+    var d = g.getImageData(0, 0, 52, 52); return { width: 52, height: 52, data: d.data };
+  }
   function trackGeo() { return { type: "Feature", geometry: { type: "LineString", coordinates: track.length > 1 ? track : [] }, properties: {} }; }
 
   function init() {
@@ -64,6 +79,13 @@
           "line-width": ["case", ["==", ["get", "act"], 1], 8, 6], "line-opacity": 0.75 } });
       addBelow({ id: "trk", type: "line", source: "trk", layout: { "line-cap": "round", "line-join": "round" },
         paint: { "line-color": "#4285f4", "line-width": 5, "line-opacity": 0.7 } });
+      // стационарни камери: икона + ограничение
+      if (!map.hasImage("cam")) map.addImage("cam", camIcon(), { pixelRatio: 2 });
+      map.addSource("cams", { type: "geojson", data: camsGeo() });
+      map.addLayer({ id: "cams", type: "symbol", source: "cams", minzoom: 8,
+        layout: { "icon-image": "cam", "icon-size": ["interpolate", ["linear"], ["zoom"], 8, 0.6, 14, 1], "icon-allow-overlap": true,
+          "text-field": offline ? "" : ["get", "lim"], "text-font": ["Noto Sans Bold"], "text-size": 11, "text-offset": [0, 1.5], "text-anchor": "top", "text-allow-overlap": true },
+        paint: { "text-color": "#d93025", "text-halo-color": "#fff", "text-halo-width": 1.8 } });
       map.addLayer({ id: "pts", type: "circle", source: "pts",
         paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 4, 12, 8, 16, 11], "circle-color": ["get", "col"],
           "circle-stroke-color": "#fff", "circle-stroke-width": 2.5 } });
@@ -82,7 +104,12 @@
       });
       if (handlers) { ready = true; refresh(); return; }
       handlers = true;
-      ["pts", "secs"].forEach(function (l) {
+      map.on("click", "cams", function (e) {
+        var p = e.features[0].properties;
+        new maplibregl.Popup({ offset: 14 }).setLngLat(e.lngLat)
+          .setHTML("<b>Стационарна камера</b><br>" + p.town + ", " + p.loc + (p.lim ? "<br>Ограничение <b>" + p.lim + " км/ч</b>" : "") + "<br><span style='color:#5f6b7a'>Източник: OpenStreetMap</span>").addTo(map);
+      });
+      ["pts", "secs", "cams"].forEach(function (l) {
         map.on("mouseenter", l, function () { map.getCanvas().style.cursor = "pointer"; });
         map.on("mouseleave", l, function () { map.getCanvas().style.cursor = ""; });
       });
@@ -191,6 +218,7 @@
   function refresh() {
     if (!ready) return;
     map.getSource("pts").setData(pointsGeo());
+    if (map.getSource("cams")) map.getSource("cams").setData(camsGeo());
     map.getSource("secs").setData(sectionsGeo(lastActiveId));
   }
   function resetTrack() { track = []; lastP = null; anim.to = null; anim.lastFix = 0; if (ready) map.getSource("trk").setData(trackGeo()); setFollow(true); }

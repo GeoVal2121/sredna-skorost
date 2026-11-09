@@ -193,6 +193,32 @@
     return best ? { sec: best, dist: bd } : null;
   };
 
+  // ---------- стационарни камери: предупреждение само когато камерата е напред по посоката ----------
+  function bearing(a, b) {
+    var y = Math.sin(rad(b[1] - a[1])) * Math.cos(rad(b[0])),
+      x = Math.cos(rad(a[0])) * Math.sin(rad(b[0])) - Math.sin(rad(a[0])) * Math.cos(rad(b[0])) * Math.cos(rad(b[1] - a[1]));
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+  }
+  function CamWatch(cams) { this.cams = cams || []; this.said = {}; this.last = null; this.heading = null; }
+  // fix: { p:[lat,lon], t (ms), speed (км/ч), heading (°|null) }
+  CamWatch.prototype.feed = function (fix) {
+    var ev = [], self = this, p = fix.p;
+    if (fix.heading != null && !isNaN(fix.heading) && fix.speed > 5) this.heading = fix.heading;
+    else if (this.last && dist(this.last, p) > 15) this.heading = bearing(this.last, p);
+    if (!this.last || dist(this.last, p) > 15) this.last = p;
+    if (this.heading == null) return ev;
+    var far = fix.speed > 80 ? 800 : 450;
+    this.cams.forEach(function (c, i) {
+      var d = dist(p, [c[0], c[1]]); if (d > far) return;
+      var diff = Math.abs(((bearing(p, [c[0], c[1]]) - self.heading + 540) % 360) - 180);
+      if (diff > 40 && d > 40) return; // камерата не е пред нас
+      var s = self.said[i] || (self.said[i] = { t: -1e12 });
+      if (fix.t - s.t > 600000) { s.t = fix.t; s.over = false; ev.push({ type: "cam", cam: c, dist: d }); }
+      if (c[2] && fix.speed > c[2] + 2 && d < 350 && !s.over) { s.over = true; ev.push({ type: "camOver", cam: c, dist: d, speed: fix.speed }); }
+    });
+    return ev;
+  };
+
   function decodePolyline(s) { // Google polyline, 5 знака → [[lat, lon]]
     var i = 0, la = 0, lo = 0, out = [];
     while (i < s.length) {
@@ -207,6 +233,6 @@
     return out;
   }
 
-  var api = { decodePolyline: decodePolyline, dist: dist, buildModel: buildModel, applyOverrides: applyOverrides, snapToGantries: snapToGantries, Tracker: Tracker };
+  var api = { CamWatch: CamWatch, bearing: bearing, decodePolyline: decodePolyline, dist: dist, buildModel: buildModel, applyOverrides: applyOverrides, snapToGantries: snapToGantries, Tracker: Tracker };
   if (typeof module !== "undefined") module.exports = api; else root.SSCore = api;
 })(this);
