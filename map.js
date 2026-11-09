@@ -88,7 +88,8 @@
         paint: { "line-color": "#4b8ef5", "line-width": 7 } });
       addBelow({ id: "secs", type: "line", source: "secs", layout: { "line-cap": "round" },
         paint: { "line-color": ["case", ["==", ["get", "act"], 1], "#d93025", ["==", ["get", "up"], 1], "#a08a5a", "#e8710a"],
-          "line-width": ["case", ["==", ["get", "act"], 1], 8, 6], "line-opacity": 0.75 } });
+          "line-width": ["interpolate", ["linear"], ["zoom"], 10, ["case", ["==", ["get", "act"], 1], 8, 6],
+            14, ["case", ["==", ["get", "act"], 1], 12, 10], 17, ["case", ["==", ["get", "act"], 1], 26, 22]], "line-opacity": 0.75 } });
       addBelow({ id: "trk", type: "line", source: "trk", layout: { "line-cap": "round", "line-join": "round" },
         paint: { "line-color": "#4285f4", "line-width": 5, "line-opacity": 0.7 } });
       // стационарни камери: икона + ограничение
