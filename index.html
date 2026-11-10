@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
-<link rel="stylesheet" href="lib/maplibre-gl.css?v=2026.11.10-4">
+<link rel="stylesheet" href="lib/maplibre-gl.css?v=2026.11.10-5">
 <style>
 :root{--bg:#eef1f4;--panel:#fffffff2;--line:#d8dee6;--tx:#1f2933;--mut:#5f6b7a;--ok:#188038;--warn:#e37400;--bad:#d93025;--acc:#1a73e8;
   --st:env(safe-area-inset-top);--sb:env(safe-area-inset-bottom)}
@@ -49,6 +49,8 @@ button:active{transform:scale(.97)}
 .spd span{font-size:11px;color:#555}
 .spd.over{background:var(--bad);border-color:#fff;color:#fff;animation:glow 1.2s ease-in-out infinite}.spd.over span{color:#fff}
 .spd.fast{border-color:var(--warn)}
+.spd.limover:not(.over){border-color:var(--bad);color:var(--bad)}.spd.limover:not(.over) span{color:var(--bad)}
+.rlim{width:54px;height:54px;font-size:21px;margin:0 0 4px}
 @keyframes glow{0%,100%{box-shadow:0 0 0 0 #d9302599,0 3px 12px #0005}50%{box-shadow:0 0 0 14px #d9302500,0 0 28px 8px #d93025cc}}
 /* дясна колона */
 .side{position:fixed;right:10px;bottom:calc(var(--sb) + 86px);z-index:3;display:flex;flex-direction:column;gap:8px}
@@ -135,6 +137,7 @@ html.dark .bar{background:#3d4a6b}
 html.dark .list div,html.dark .sg{border-color:#3d4a6b}
 html.dark .tabs button.on{background:#1a3a66;color:#8ab4f8}
 html.dark .spd:not(.over){background:#26314f;color:#e8eaed;border-color:#3d4a6b}
+html.dark .spd.limover:not(.over){border-color:var(--bad);color:#ff6b6b}
 html.dark .spd:not(.over) span,html.dark .maplibregl-popup-close-button{color:#a3adb8}
 html.dark .maplibregl-ctrl-attrib{background:#26314fcc!important;color:#a3adb8}
 html.dark .maplibregl-ctrl-attrib a{color:#c8ccd0}
@@ -171,7 +174,7 @@ html.dark .maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color
 
 <div class="chips"><span class="chip" id="gps">GPS: изкл.</span><span class="chip" id="osm">…</span></div>
 
-<div class="spdw"><div class="spd" id="spdBox"><b id="spd">–</b><span>км/ч</span></div></div>
+<div class="spdw"><div class="spd" id="spdBox"><b id="spd">–</b><span>км/ч</span></div><div class="limit rlim" id="roadLim" hidden></div></div>
 
 <div class="side">
   <button id="center" aria-label="Центрирай">◎</button>
@@ -211,6 +214,7 @@ html.dark .maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color
   <p class="mut" id="voiceNote" hidden style="margin:8px 0;font-size:13px">На телефона няма инсталиран български глас и указанията ще звучат неправилно. Android: Настройки → Достъпност (или Система) → Преобразуване на текст в говор → Google → Инсталиране на гласови данни → Български. iPhone: Настройки → Достъпност → Изговорено съдържание → Гласове → Български.</p>
   <div class="row"><span>Звуков сигнал при превишаване</span><input type="checkbox" id="beep"></div>
   <div class="row"><span>Стационарни камери (карта и глас)</span><input type="checkbox" id="camsOn"></div>
+  <div class="row"><span>Ограничение на пътя (знак и предупреждение)</span><input type="checkbox" id="roadLimOn"></div>
   <div class="btns">
     <button id="osmBtn">Обнови рамките от OSM</button>
     <button id="clrBtn">Изтрий калибрациите</button>
@@ -238,15 +242,16 @@ html.dark .maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color
 
 <div class="toast" id="toast"></div>
 
-<script src="lib/maplibre-gl.js?v=2026.11.10-4"></script>
-<script src="towns.js?v=2026.11.10-4"></script>
-<script src="data.js?v=2026.11.10-4"></script>
-<script src="cameras.js?v=2026.11.10-4"></script>
-<script src="geometry.js?v=2026.11.10-4"></script>
-<script src="core.js?v=2026.11.10-4"></script>
-<script src="app.js?v=2026.11.10-4"></script>
-<script src="map.js?v=2026.11.10-4"></script>
-<script src="navcore.js?v=2026.11.10-4"></script>
-<script src="nav.js?v=2026.11.10-4"></script>
+<script src="lib/maplibre-gl.js?v=2026.11.10-5"></script>
+<script src="towns.js?v=2026.11.10-5"></script>
+<script src="data.js?v=2026.11.10-5"></script>
+<script src="roadlim.js?v=2026.11.10-5"></script>
+<script src="cameras.js?v=2026.11.10-5"></script>
+<script src="geometry.js?v=2026.11.10-5"></script>
+<script src="core.js?v=2026.11.10-5"></script>
+<script src="app.js?v=2026.11.10-5"></script>
+<script src="map.js?v=2026.11.10-5"></script>
+<script src="navcore.js?v=2026.11.10-5"></script>
+<script src="nav.js?v=2026.11.10-5"></script>
 </body>
 </html>

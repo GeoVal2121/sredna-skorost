@@ -2,7 +2,7 @@
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
   // ---------- нова версия: ако телефонът е запазил стара, презарежда се автоматично ----------
-  var APP_VERSION = "2026.11.10-4";
+  var APP_VERSION = "2026.11.10-5";
   try {
     fetch("version.json?t=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
       if (j && j.v && j.v !== APP_VERSION && sessionStorage.getItem("ss_reload") !== j.v) {
@@ -15,7 +15,7 @@
     get: function (k, d) { try { var v = localStorage.getItem("ss_" + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
     set: function (k, v) { try { localStorage.setItem("ss_" + k, JSON.stringify(v)); } catch (e) { } }
   };
-  var cfg = Object.assign({ margin: 3, voice: true, beep: true, headUp: true, cams: true }, store.get("cfg", {}));
+  var cfg = Object.assign({ margin: 3, voice: true, beep: true, headUp: true, cams: true, roadLim: true }, store.get("cfg", {}));
   var camWatch = new SSCore.CamWatch(window.SS_CAMS || []);
   var manual = store.get("manual", {});           // ръчни калибрации
   var osmCache = store.get("osm", null);          // { t, g:[[lat,lon]] }
@@ -143,6 +143,22 @@
     }
   }
 
+  // ---------- ограничение на пътя ----------
+  // знак до километража; при превишаване с 5+ км/ч – червен километраж, сигнал и глас (повтор след 30 с)
+  var rlOver = 0, rlSaid = 0, rlSaidLim = null;
+  function roadLimit(fix) {
+    var box = $("roadLim"), lim = cfg.roadLim && window.SSRoadLim ? SSRoadLim.feed([fix.lat, fix.lon], fix.heading, tracker.speed, window.SSMap && SSMap.roadAt) : null;
+    box.hidden = !lim; if (lim) box.textContent = lim;
+    var over = !!lim && tracker.speed >= lim + 5;
+    $("spdBox").classList.toggle("limover", over);
+    rlOver = over ? rlOver + 1 : 0;
+    if (rlOver >= 2 && (lim !== rlSaidLim || fix.t - rlSaid > 30000)) {
+      rlSaid = fix.t; rlSaidLim = lim;
+      beep(1); say("Ограничение " + lim + ". Намалете.", false);
+    }
+    if (!over && rlOver === 0 && fix.t - rlSaid > 30000) rlSaidLim = null;
+  }
+
   // ---------- позиция ----------
   function onFix(fix) {
     lastFix = fix;
@@ -150,6 +166,7 @@
     evs.forEach(onEvent);
     if (cfg.cams) camWatch.feed({ p: [fix.lat, fix.lon], t: fix.t, speed: tracker.speed, heading: fix.heading }).forEach(onCam);
     render(fix.t);
+    roadLimit(fix);
     var snap = window.SSNav ? SSNav.onFix(fix) : null;
     if (window.SSMap) SSMap.onFix(fix, snap);
     var g = $("gps");
@@ -352,6 +369,8 @@
   $("closeSet").onclick = function () { $("sheet").classList.remove("show"); };
   $("introOk").onclick = function () { $("intro").classList.remove("show"); store.set("intro", 1); unlockAudio(); };
   $("margin").value = String(cfg.margin); $("voice").checked = cfg.voice; $("beep").checked = cfg.beep; $("headUp").checked = cfg.headUp; $("camsOn").checked = cfg.cams;
+  $("roadLimOn").checked = cfg.roadLim;
+  $("roadLimOn").onchange = function () { cfg.roadLim = this.checked; store.set("cfg", cfg); if (!cfg.roadLim) { $("roadLim").hidden = true; $("spdBox").classList.remove("limover"); } };
   $("camsOn").onchange = function () { cfg.cams = this.checked; store.set("cfg", cfg); if (window.SSMap) SSMap.refresh(); };
   $("headUp").onchange = function () { cfg.headUp = this.checked; store.set("cfg", cfg); if (window.SSMap) SSMap.recenter(); };
   $("margin").onchange = function () { cfg.margin = +this.value; tracker.margin = cfg.margin; store.set("cfg", cfg); };

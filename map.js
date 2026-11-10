@@ -266,6 +266,20 @@
   }
   function resetTrack() { track = []; lastP = null; anim.to = null; anim.lastFix = 0; if (ready) map.getSource("trk").setData(trackGeo()); setFollow(true); }
 
+  // вид на пътя под точката и дали е в населено място (жилищна зона или сгради наоколо) – от картата
+  function roadAt(p) {
+    if (!map || !ready || offline) return null;
+    var c = map.project([p[1], p[0]]), cls = null, urban = false, bld = 0;
+    map.queryRenderedFeatures([[c.x - 6, c.y - 6], [c.x + 6, c.y + 6]]).forEach(function (f) {
+      if (f.sourceLayer === "transportation" && !cls) cls = f.properties["class"];
+    });
+    map.queryRenderedFeatures([[c.x - 60, c.y - 60], [c.x + 60, c.y + 60]]).forEach(function (f) {
+      if (f.sourceLayer === "landuse" && f.properties["class"] === "residential") urban = true;
+      if (f.sourceLayer === "building") bld++;
+    });
+    return { cls: cls, urban: urban || bld >= 3 };
+  }
+
   function setRoute(line, fit) {
     routeLine = line; routeFrom = 0; routeHead = null; if (ready) map.getSource("route").setData(routeGeo());
     if (line && fit && map) {
@@ -281,6 +295,6 @@
   function center() { if (!map) return null; var c = map.getCenter(); return [c.lat, c.lng]; }
 
   window.SSMap = { onFix: onFix, refresh: refresh, recenter: function () { setFollow(true); recenter(); }, resetTrack: resetTrack,
-    setRoute: setRoute, setDest: setDest, center: center, setTheme: setTheme, follow: function () { setFollow(true); recenter(); } };
+    setRoute: setRoute, setDest: setDest, center: center, setTheme: setTheme, roadAt: roadAt, follow: function () { setFollow(true); recenter(); } };
   init();
 })();
