@@ -13,7 +13,8 @@
   // overrides: { "T:Чирпан": { p:[lat,lon], src:"osm"|"manual" } }
   function buildModel(data, overrides) {
     var points = {}, sections = [], k;
-    for (k in data.points) points[k] = { key: k, p: data.points[k], src: "approx" };
+    var exact = {}; (data.exact || []).forEach(function (x) { exact[x] = 1; });
+    for (k in data.points) points[k] = { key: k, p: data.points[k], src: exact[k] ? "osm" : "approx" };
     applyOverrides(points, overrides);
     data.sections.forEach(function (r, i) {
       var road = r[0], a = road + ":" + r[1], b = road + ":" + r[3], L = Math.abs(r[4] - r[2]);
