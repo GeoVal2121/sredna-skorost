@@ -171,10 +171,16 @@
   }
 
   // ---------- плавно движение: стрелката и камерата се интерполират между GPS точките ----------
-  var anim = { from: null, to: null, h0: 0, h1: 0, t0: 0, dur: 1000, lastFix: 0 }, raf = null, camBearing = null, easing = false;
+  // без закъснение: стрелката се плъзга ~0,35 с към новата точка и продължава напред със скоростта и посоката (до 1,2 с без нов сигнал)
+  var anim = { from: null, to: null, h0: 0, h1: 0, t0: 0, dur: 350, lastFix: 0, v: 0, vh: 0 }, raf = null, camBearing = null, easing = false;
+  function ahead(p, h, d) {
+    var r = h * Math.PI / 180;
+    return [p[0] + d * Math.cos(r) / 111320, p[1] + d * Math.sin(r) / (111320 * Math.cos(p[0] * Math.PI / 180))];
+  }
   function lerpAngle(a, b, t) { var d = ((b - a + 540) % 360) - 180; return (a + d * t + 360) % 360; }
   function animPos(now) {
     var t = Math.min(1, (now - anim.t0) / anim.dur), f = anim.from, g = anim.to;
+    if (anim.v > 0.7) g = ahead(g, anim.vh, anim.v * Math.min(1.2, (now - anim.t0) / 1000));
     return { p: [f[0] + (g[0] - f[0]) * t, f[1] + (g[1] - f[1]) * t], h: lerpAngle(anim.h0, anim.h1, t), t: t };
   }
   function pad() { return { top: Math.round(map.getCanvas().clientHeight * 0.5), bottom: 100, left: 0, right: 0 }; } // стрелката в долната трета
@@ -195,7 +201,7 @@
       map.jumpTo(opt);
     }
     // анимира докато има движение; спира, ако GPS мълчи над 3 сек.
-    if (c.t < 1 || (follow && now - anim.lastFix < 3000)) raf = requestAnimationFrame(frame);
+    if (c.t < 1 || now - anim.lastFix < 3000) raf = requestAnimationFrame(frame);
   }
 
   function onFix(fix, snap) {
@@ -211,7 +217,7 @@
     var now = performance.now(), cur = anim.to ? animPos(now) : { p: p, h: heading };
     if (anim.to && SSCore.dist(cur.p, p) > 2000) cur = { p: p, h: heading }; // голям скок (демо, нов маршрут) — без анимация
     anim.from = cur.p; anim.h0 = cur.h; anim.to = p; anim.h1 = heading; anim.t0 = now;
-    anim.dur = Math.max(40, Math.min(1500, anim.lastFix ? now - anim.lastFix : 1000)); anim.lastFix = now;
+    anim.v = (App.tracker().speed || 0) / 3.6; anim.vh = heading; anim.lastFix = now;
     if (!raf) raf = requestAnimationFrame(frame);
     if (ready) {
       map.getSource("trk").setData(trackGeo());
