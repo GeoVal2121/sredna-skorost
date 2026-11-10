@@ -91,7 +91,7 @@
           "line-width": ["interpolate", ["linear"], ["zoom"], 10, ["case", ["==", ["get", "act"], 1], 8, 6],
             14, ["case", ["==", ["get", "act"], 1], 12, 10], 17, ["case", ["==", ["get", "act"], 1], 26, 22]], "line-opacity": 0.75 } });
       addBelow({ id: "trk", type: "line", source: "trk", layout: { "line-cap": "round", "line-join": "round" },
-        paint: { "line-color": "#4285f4", "line-width": 5, "line-opacity": 0.7 } });
+        paint: { "line-color": isDark ? "#8c95ab" : "#9aa0a6", "line-width": 5, "line-opacity": 0.8 } });
       // стационарни камери: икона + ограничение
       if (!map.hasImage("cam")) map.addImage("cam", camIcon(), { pixelRatio: 2 });
       map.addSource("cams", { type: "geojson", data: camsGeo() });
@@ -162,7 +162,30 @@
     var ll = map.unproject(xy); if (navigator.vibrate) try { navigator.vibrate(30); } catch (e) { }
     SSNav.onLongPress([ll.lat, ll.lng]);
   }
-  function routeGeo() { return { type: "Feature", geometry: { type: "LineString", coordinates: routeLine ? routeLine.map(function (q) { return [q[1], q[0]]; }) : [] }, properties: {} }; }
+  // показва се само оставащият път: от текущата позиция до края
+  var routeFrom = 0, routeHead = null;
+  function routeGeo() {
+    if (!routeLine) return { type: "Feature", geometry: { type: "LineString", coordinates: [] }, properties: {} };
+    var c = routeLine.slice(routeFrom + (routeHead ? 1 : 0)).map(function (q) { return [q[1], q[0]]; });
+    if (routeHead) c.unshift([routeHead[1], routeHead[0]]);
+    return { type: "Feature", geometry: { type: "LineString", coordinates: c.length > 1 ? c : [] }, properties: {} };
+  }
+  function trimRoute(p) {
+    if (!routeLine || routeLine.length < 2) return;
+    var k = Math.cos(p[0] * Math.PI / 180), best = -1, bd = Infinity, bq = null;
+    function scan(i0, i1) {
+      for (var i = i0; i < i1; i++) {
+        var a = routeLine[i], b = routeLine[i + 1], ax = a[1] * k, ay = a[0], dx = b[1] * k - ax, dy = b[0] - ay, l = dx * dx + dy * dy;
+        var t = l ? Math.max(0, Math.min(1, ((p[1] * k - ax) * dx + (p[0] - ay) * dy) / l)) : 0, q = [ay + t * dy, (ax + t * dx) / k], d = SSCore.dist(p, q);
+        if (d < bd) { bd = d; best = i; bq = q; }
+      }
+    }
+    scan(routeFrom, Math.min(routeLine.length - 1, routeFrom + 300)); // напред от последната позиция
+    if (bd > 60) scan(0, routeLine.length - 1);                          // след отклонение / нов маршрут
+    if (bd > 60) return;
+    routeFrom = best; routeHead = bq;
+    if (ready) map.getSource("route").setData(routeGeo());
+  }
 
   function bearingDeg(a, b) {
     var r = Math.PI / 180, y = Math.sin((b[1] - a[1]) * r) * Math.cos(b[0] * r),
@@ -211,6 +234,7 @@
     else if (lastP && SSCore.dist(lastP, p) > 8) heading = bearingDeg(lastP, p);
     var moved = !lastP || SSCore.dist(lastP, p) > 8;
     lastP = p;
+    trimRoute(p);
     // следа само от точни позиции (или прилепени към маршрута)
     if (moved && (snap || !fix.acc || fix.acc <= 25)) { track.push([p[1], p[0]]); if (track.length > 6000) track.shift(); }
     if (!car) car = new maplibregl.Marker({ element: carEl, rotationAlignment: "map", pitchAlignment: "viewport" }).setLngLat([p[1], p[0]]).addTo(map);
@@ -243,7 +267,7 @@
   function resetTrack() { track = []; lastP = null; anim.to = null; anim.lastFix = 0; if (ready) map.getSource("trk").setData(trackGeo()); setFollow(true); }
 
   function setRoute(line, fit) {
-    routeLine = line; if (ready) map.getSource("route").setData(routeGeo());
+    routeLine = line; routeFrom = 0; routeHead = null; if (ready) map.getSource("route").setData(routeGeo());
     if (line && fit && map) {
       var b = new maplibregl.LngLatBounds(); line.forEach(function (q) { b.extend([q[1], q[0]]); });
       setFollow(false); clearTimeout(refollowT);
