@@ -2,7 +2,7 @@
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
   // ---------- нова версия: ако телефонът е запазил стара, презарежда се автоматично ----------
-  var APP_VERSION = "2026.11.10-5";
+  var APP_VERSION = "2026.11.11-3";
   try {
     fetch("version.json?t=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
       if (j && j.v && j.v !== APP_VERSION && sessionStorage.getItem("ss_reload") !== j.v) {
@@ -160,8 +160,13 @@
   }
 
   // ---------- позиция ----------
+  // без нов сигнал над 3 с – знак „няма сигнал“ (стрелката продължава по пътя)
+  var lastRecv = 0;
+  setInterval(function () {
+    if (watchId != null && lastRecv && Date.now() - lastRecv > 3000) { var g = $("gps"); g.textContent = "GPS: няма сигнал"; g.className = "chip bad"; }
+  }, 1000);
   function onFix(fix) {
-    lastFix = fix;
+    lastFix = fix; lastRecv = Date.now();
     var evs = tracker.feed(fix);
     evs.forEach(onEvent);
     if (cfg.cams) camWatch.feed({ p: [fix.lat, fix.lon], t: fix.t, speed: tracker.speed, heading: fix.heading }).forEach(onCam);

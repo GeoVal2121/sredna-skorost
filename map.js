@@ -86,8 +86,12 @@
         paint: { "line-color": "#1557b0", "line-width": 11, "line-opacity": 0.9 } });
       addBelow({ id: "route", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" },
         paint: { "line-color": "#4b8ef5", "line-width": 7 } });
-      addBelow({ id: "secs", type: "line", source: "secs", layout: { "line-cap": "round" },
-        paint: { "line-color": ["case", ["==", ["get", "act"], 1], "#d93025", ["==", ["get", "up"], 1], "#a08a5a", "#e8710a"],
+      // предстоящите (още непуснати) отсечки: лилава прекъсната линия
+      addBelow({ id: "secs-up", type: "line", source: "secs", filter: ["all", ["==", ["get", "up"], 1], ["!=", ["get", "act"], 1]],
+        paint: { "line-color": "#9334e6", "line-dasharray": [1.2, 1], "line-opacity": 0.85,
+          "line-width": ["interpolate", ["linear"], ["zoom"], 10, 5, 14, 8, 17, 18] } });
+      addBelow({ id: "secs", type: "line", source: "secs", layout: { "line-cap": "round" }, filter: ["any", ["!=", ["get", "up"], 1], ["==", ["get", "act"], 1]],
+        paint: { "line-color": ["case", ["==", ["get", "act"], 1], "#d93025", "#e8710a"],
           "line-width": ["interpolate", ["linear"], ["zoom"], 10, ["case", ["==", ["get", "act"], 1], 8, 6],
             14, ["case", ["==", ["get", "act"], 1], 12, 10], 17, ["case", ["==", ["get", "act"], 1], 26, 22]], "line-opacity": 0.75 } });
       addBelow({ id: "trk", type: "line", source: "trk", layout: { "line-cap": "round", "line-join": "round" },
@@ -112,7 +116,7 @@
         new maplibregl.Popup({ offset: 10 }).setLngLat(e.lngLat)
           .setHTML("<b>" + p.name + "</b><br>" + p.road + (p.km != null ? ", км " + String(p.km).replace(".", ",") : "") + "<br><span style='color:#5f6b7a'>Позиция: " + srcT + "</span>").addTo(map);
       });
-      map.on("click", "secs", function (e) {
+      map.on("click", ["secs", "secs-up"], function (e) {
         var p = e.features[0].properties;
         new maplibregl.Popup({ offset: 6 }).setLngLat(e.lngLat)
           .setHTML("<b>" + p.name + "</b><br>" + String((+p.L).toFixed(1)).replace(".", ",") + " км · ограничение " + p.limit + (p.up == 1 ? "<br>предстояща" : "")).addTo(map);
@@ -122,7 +126,7 @@
         new maplibregl.Popup({ offset: 14 }).setLngLat(e.lngLat)
           .setHTML("<b>Стационарна камера</b><br>" + p.town + ", " + p.loc + (p.lim ? "<br>Ограничение <b>" + p.lim + " км/ч</b>" : "") + "<br><span style='color:#5f6b7a'>Източник: OpenStreetMap</span>").addTo(map);
       });
-      ["pts", "secs", "cams"].forEach(function (l) {
+      ["pts", "secs", "secs-up", "cams"].forEach(function (l) {
         map.on("mouseenter", l, function () { map.getCanvas().style.cursor = "pointer"; });
         map.on("mouseleave", l, function () { map.getCanvas().style.cursor = ""; });
       });
@@ -195,22 +199,37 @@
 
   // ---------- плавно движение: стрелката и камерата се интерполират между GPS точките ----------
   // без закъснение: стрелката се плъзга ~0,35 с към новата точка и продължава напред със скоростта и посоката (до 1,2 с без нов сигнал)
-  var anim = { from: null, to: null, h0: 0, h1: 0, t0: 0, dur: 350, lastFix: 0, v: 0, vh: 0 }, raf = null, camBearing = null, easing = false;
+  var anim = { from: null, to: null, h0: 0, h1: 0, t0: 0, dur: 350, lastFix: 0, v: 0, vh: 0, age: 0, path: null, dr: false }, raf = null, camBearing = null, easing = false;
   function ahead(p, h, d) {
     var r = h * Math.PI / 180;
     return [p[0] + d * Math.cos(r) / 111320, p[1] + d * Math.sin(r) / (111320 * Math.cos(p[0] * Math.PI / 180))];
   }
   function lerpAngle(a, b, t) { var d = ((b - a + 540) % 360) - 180; return (a + d * t + 360) % 360; }
+  // точка на разстояние d по линия (и посоката там)
+  function along(path, d) {
+    for (var i = 1; i < path.length; i++) {
+      var a = path[i - 1], b = path[i], l = SSCore.dist(a, b);
+      if (d <= l || i === path.length - 1) { var f = l ? Math.min(1, d / l) : 0; return { p: [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f], h: bearingDeg(a, b) }; }
+      d -= l;
+    }
+    return { p: path[0], h: null };
+  }
+  // позиция на стрелката: плъзгане към новата точка + напред по скоростта, като се добавя и закъснението на точката (age);
+  // без сигнал над 1,5 с (тунел) – продължава по пътя/маршрута с последната скорост до 60 с
   function animPos(now) {
-    var t = Math.min(1, (now - anim.t0) / anim.dur), f = anim.from, g = anim.to;
-    if (anim.v > 0.7) g = ahead(g, anim.vh, anim.v * Math.min(1.2, (now - anim.t0) / 1000));
-    return { p: [f[0] + (g[0] - f[0]) * t, f[1] + (g[1] - f[1]) * t], h: lerpAngle(anim.h0, anim.h1, t), t: t };
+    var t = Math.min(1, (now - anim.t0) / anim.dur), f = anim.from, g = anim.to, h1 = anim.h1;
+    var dt = (now - anim.t0) / 1000 + anim.age;
+    anim.dr = anim.v > 4 && dt > 1.5 && !!anim.path;
+    if (anim.dr) { var a = along(anim.path, anim.v * Math.min(dt, 60)); g = a.p; if (a.h != null) h1 = a.h; }
+    else if (anim.v > 0.7) g = ahead(g, anim.vh, anim.v * Math.min(1.5, dt));
+    return { p: [f[0] + (g[0] - f[0]) * t, f[1] + (g[1] - f[1]) * t], h: lerpAngle(anim.h0, h1, t), t: t };
   }
   function pad() { return { top: Math.round(map.getCanvas().clientHeight * 0.5), bottom: 100, left: 0, right: 0 }; } // стрелката в долната трета
   function frame() {
     raf = null; if (!anim.to) return;
     var now = performance.now(), c = animPos(now);
     car.setLngLat([c.p[1], c.p[0]]).setRotation(c.h);
+    carEl.style.opacity = anim.dr ? "0.55" : "";
     if (follow && !touching && !easing) {
       var up = App.cfg.headUp, moving = App.tracker().speed > 8;
       if (camBearing == null) camBearing = map.getBearing();
@@ -224,7 +243,57 @@
       map.jumpTo(opt);
     }
     // анимира докато има движение; спира, ако GPS мълчи над 3 сек.
-    if (c.t < 1 || now - anim.lastFix < 3000) raf = requestAnimationFrame(frame);
+    if (c.t < 1 || now - anim.lastFix < (anim.v > 4 ? 61000 : 3000)) raf = requestAnimationFrame(frame);
+  }
+
+  // без маршрут следата се прилепва към пътя от картата: най-близкият път до 20 м в посоката на движение,
+  // а между две точки на един и същ път се добавят и завоите му
+  var ROADS = { motorway: 1, trunk: 1, primary: 1, secondary: 1, tertiary: 1, minor: 1, service: 1, busway: 1 }, prevSnap = null;
+  function proj(p, a, b) {
+    var k = Math.cos(p[0] * Math.PI / 180), ax = a[1] * k, ay = a[0], dx = b[1] * k - ax, dy = b[0] - ay, l = dx * dx + dy * dy;
+    var t = l ? Math.max(0, Math.min(1, ((p[1] * k - ax) * dx + (p[0] - ay) * dy) / l)) : 0, q = [ay + t * dy, (ax + t * dx) / k];
+    return { q: q, t: t, d: SSCore.dist(p, q) };
+  }
+  function roadSnap(p, h) {
+    if (!ready || offline) return null;
+    var c = map.project([p[1], p[0]]), best = null;
+    map.queryRenderedFeatures([[c.x - 30, c.y - 30], [c.x + 30, c.y + 30]]).forEach(function (f) {
+      if (f.sourceLayer !== "transportation" || !ROADS[f.properties["class"]]) return;
+      var g = f.geometry, lines = g.type === "LineString" ? [g.coordinates] : g.type === "MultiLineString" ? g.coordinates : [];
+      lines.forEach(function (ll) {
+        var line = ll.map(function (x) { return [x[1], x[0]]; });
+        for (var i = 1; i < line.length; i++) {
+          var r = proj(p, line[i - 1], line[i]), pen = 0;
+          if (r.d > 20) continue;
+          if (h != null) { var diff = Math.abs(((bearingDeg(line[i - 1], line[i]) - h) % 360 + 540) % 360 - 180); if (diff > 50 && diff < 130) pen = 12; }
+          if (!best || r.d + pen < best.s) best = { s: r.d + pen, pt: r.q, line: line, i: i, t: r.t };
+        }
+      });
+    });
+    return best;
+  }
+  // път напред за движение без сигнал: маршрутът при навигация, иначе пътят от картата в посоката на движение
+  function forwardPath(sn, h) {
+    if (routeLine && routeHead) return [routeHead].concat(routeLine.slice(routeFrom + 1, routeFrom + 400));
+    if (!sn) return null;
+    var a = sn.line[sn.i - 1], b = sn.line[sn.i];
+    var fwd = h == null || Math.abs(((bearingDeg(a, b) - h) % 360 + 540) % 360 - 180) < 90;
+    var rest = fwd ? sn.line.slice(sn.i) : sn.line.slice(0, sn.i).reverse();
+    return rest.length ? [sn.pt].concat(rest) : null;
+  }
+  function addTrack(p, h, sn) {
+    if (sn && prevSnap) {
+      // предишната точка на същия път → завоите между двете точки
+      var j = -1, bd = 4;
+      for (var i = 1; i < sn.line.length; i++) { var r = proj(prevSnap, sn.line[i - 1], sn.line[i]); if (r.d < bd) { bd = r.d; j = i; } }
+      if (j > 0 && Math.abs(sn.i - j) < 200) {
+        if (j < sn.i) for (var a = j; a < sn.i; a++) track.push([sn.line[a][1], sn.line[a][0]]);
+        else for (var b2 = j - 1; b2 >= sn.i; b2--) track.push([sn.line[b2][1], sn.line[b2][0]]);
+      }
+    }
+    var q = sn ? sn.pt : p;
+    track.push([q[1], q[0]]); prevSnap = sn ? q : null;
+    while (track.length > 6000) track.shift();
   }
 
   function onFix(fix, snap) {
@@ -236,12 +305,18 @@
     lastP = p;
     trimRoute(p);
     // следа само от точни позиции (или прилепени към маршрута)
-    if (moved && (snap || !fix.acc || fix.acc <= 25)) { track.push([p[1], p[0]]); if (track.length > 6000) track.shift(); }
+    var hh = (fix.speed || 0) > 2 ? heading : null, sn = snap ? null : roadSnap(p, hh);
+    if (moved && (snap || !fix.acc || fix.acc <= 25)) {
+      if (snap) { track.push([p[1], p[0]]); prevSnap = null; if (track.length > 6000) track.shift(); }
+      else addTrack(p, hh, sn);
+    }
     if (!car) car = new maplibregl.Marker({ element: carEl, rotationAlignment: "map", pitchAlignment: "viewport" }).setLngLat([p[1], p[0]]).addTo(map);
     var now = performance.now(), cur = anim.to ? animPos(now) : { p: p, h: heading };
     if (anim.to && SSCore.dist(cur.p, p) > 2000) cur = { p: p, h: heading }; // голям скок (демо, нов маршрут) — без анимация
     anim.from = cur.p; anim.h0 = cur.h; anim.to = p; anim.h1 = heading; anim.t0 = now;
     anim.v = (App.tracker().speed || 0) / 3.6; anim.vh = heading; anim.lastFix = now;
+    anim.age = fix.t ? Math.max(0, Math.min(1.5, (Date.now() - fix.t) / 1000)) : 0;
+    anim.path = forwardPath(sn, heading); if (anim.path) anim.path[0] = p;
     if (!raf) raf = requestAnimationFrame(frame);
     if (ready) {
       map.getSource("trk").setData(trackGeo());
@@ -264,7 +339,7 @@
     if (map.getSource("cams")) map.getSource("cams").setData(camsGeo());
     map.getSource("secs").setData(sectionsGeo(lastActiveId));
   }
-  function resetTrack() { track = []; lastP = null; anim.to = null; anim.lastFix = 0; if (ready) map.getSource("trk").setData(trackGeo()); setFollow(true); }
+  function resetTrack() { track = []; prevSnap = null; lastP = null; anim.to = null; anim.lastFix = 0; if (ready) map.getSource("trk").setData(trackGeo()); setFollow(true); }
 
   // вид на пътя под точката и дали е в населено място (жилищна зона или сгради наоколо) – от картата
   function roadAt(p) {
