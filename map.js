@@ -86,9 +86,9 @@
         paint: { "line-color": "#1557b0", "line-width": 11, "line-opacity": 0.9 } });
       addBelow({ id: "route", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" },
         paint: { "line-color": "#4b8ef5", "line-width": 7 } });
-      // предстоящите (още непуснати) отсечки: лилава прекъсната линия
+      // предстоящите (още непуснати) отсечки: бледа сива прекъсната линия – да не се бъркат с работещите (ярко оранжеви)
       addBelow({ id: "secs-up", type: "line", source: "secs", filter: ["all", ["==", ["get", "up"], 1], ["!=", ["get", "act"], 1]],
-        paint: { "line-color": isDark ? "#c58af9" : "#9334e6", "line-dasharray": [1.2, 1], "line-opacity": isDark ? 1 : 0.85,
+        paint: { "line-color": isDark ? "#8f99b3" : "#b3b9c0", "line-dasharray": [1.2, 1], "line-opacity": 0.7,
           "line-width": ["interpolate", ["linear"], ["zoom"], 10, 5, 14, 8, 17, 18] } });
       addBelow({ id: "secs", type: "line", source: "secs", layout: { "line-cap": "round" }, filter: ["any", ["!=", ["get", "up"], 1], ["==", ["get", "act"], 1]],
         // на тъмен фон – по-ярки и непрозрачни, иначе оранжевото изглежда кафяво

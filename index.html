@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
-<link rel="stylesheet" href="lib/maplibre-gl.css?v=2026.11.11-4">
+<link rel="stylesheet" href="lib/maplibre-gl.css?v=2026.11.13-1">
 <style>
 :root{--bg:#eef1f4;--panel:#fffffff2;--line:#d8dee6;--tx:#1f2933;--mut:#5f6b7a;--ok:#188038;--warn:#e37400;--bad:#d93025;--acc:#1a73e8;
   --st:env(safe-area-inset-top);--sb:env(safe-area-inset-bottom)}
@@ -86,7 +86,7 @@ button:active{transform:scale(.97)}
 .list{font-size:14px;margin-top:10px}
 .list div{padding:6px 0;border-bottom:1px solid #e6eaf0;display:flex;justify-content:space-between;gap:8px}
 .tag{font-size:11px;padding:1px 6px;border-radius:6px;background:#f1f4f8;color:var(--mut);white-space:nowrap}
-.tag.osm{color:var(--acc)}.tag.manual{color:var(--ok)}.tag.u{color:#9334e6}
+.tag.osm{color:var(--acc)}.tag.manual{color:var(--ok)}.tag.u{color:var(--mut)}
 .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .btns button{flex:1;min-width:140px}
 .toast{position:fixed;left:50%;bottom:calc(var(--sb) + 190px);transform:translateX(-50%);background:#202124ee;color:#fff;border:1px solid #202124;padding:10px 14px;border-radius:10px;font-size:14px;display:none;z-index:9;max-width:90vw;text-align:center}
@@ -142,6 +142,12 @@ html.dark .spd:not(.over) span,html.dark .maplibregl-popup-close-button{color:#a
 html.dark .maplibregl-ctrl-attrib{background:#26314fcc!important;color:#a3adb8}
 html.dark .maplibregl-ctrl-attrib a{color:#c8ccd0}
 html.dark .maplibregl-ctrl-icon{filter:invert(1)}
+#themeEdge{position:fixed;right:0;top:30%;width:28px;height:120px;z-index:6;touch-action:none;display:flex;align-items:center;justify-content:flex-end}
+#themeEdge i{display:block;width:6px;height:64px;margin-right:3px;border-radius:3px;background:linear-gradient(#fff 50%,#1e2740 50%);box-shadow:0 0 0 1px rgba(0,0,0,.25),0 1px 4px rgba(0,0,0,.25);transition:transform .15s}
+#themeEdge.drag i{transform:scaleX(1.6)}
+/* компас: бялото сочи север, червеното – юг */
+.maplibregl-ctrl button.maplibregl-ctrl-compass .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2229%22%20height%3D%2229%22%20viewBox%3D%220%200%2029%2029%22%3E%3Cpath%20d%3D%22M14.5%203.5%209.5%2014.5h10z%22%20fill%3D%22%23fff%22%20stroke%3D%22%233c4043%22%20stroke-width%3D%221.2%22%20stroke-linejoin%3D%22round%22/%3E%3Cpath%20d%3D%22M9.5%2014.5h10l-5%2011z%22%20fill%3D%22%23d93025%22%20stroke%3D%22%23a50e0e%22%20stroke-width%3D%221.2%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E")!important}
+html.dark .maplibregl-ctrl-compass .maplibregl-ctrl-icon{filter:none}
 html.dark [class*=popup-anchor-bottom] .maplibregl-popup-tip{border-top-color:#26314f}
 html.dark [class*=popup-anchor-top] .maplibregl-popup-tip{border-bottom-color:#26314f}
 html.dark .maplibregl-popup-anchor-left .maplibregl-popup-tip{border-right-color:#26314f}
@@ -176,6 +182,8 @@ html.dark .maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color
 
 <div class="spdw"><div class="spd" id="spdBox"><b id="spd">–</b><span>км/ч</span></div><div class="limit rlim" id="roadLim" hidden></div></div>
 
+<!-- отметка в десния край: плъзгане наляво сменя светъл/тъмен фон -->
+<div id="themeEdge" aria-label="Плъзнете наляво за смяна на фона"><i></i></div>
 <div class="side">
   <button id="center" aria-label="Центрирай">◎</button>
   <button id="setBtn" aria-label="Настройки">☰</button>
@@ -209,6 +217,7 @@ html.dark .maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color
   <div class="row"><span>Резерв под ограничението</span>
     <select id="margin"><option value="0">0 км/ч</option><option value="3">3 км/ч</option><option value="5">5 км/ч</option><option value="10">10 км/ч</option></select></div>
   <div class="row"><span>Картата по посоката на движение</span><input type="checkbox" id="headUp"></div>
+  <div class="row"><span>Фон (или плъзнете наляво от отметката в десния край)</span><select id="themeSel"><option value="auto">автоматичен</option><option value="light">светъл</option><option value="dark">тъмен</option></select></div>
   <div class="row"><span>Гласови съобщения</span><input type="checkbox" id="voice"></div>
   <div class="row"><span>Глас</span><select id="voiceSel" style="max-width:60%"></select></div>
   <p class="mut" id="voiceNote" hidden style="margin:8px 0;font-size:13px">На телефона няма инсталиран български глас и указанията ще звучат неправилно. Android: Настройки → Достъпност (или Система) → Преобразуване на текст в говор → Google → Инсталиране на гласови данни → Български. iPhone: Настройки → Достъпност → Изговорено съдържание → Гласове → Български.</p>
@@ -242,16 +251,16 @@ html.dark .maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color
 
 <div class="toast" id="toast"></div>
 
-<script src="lib/maplibre-gl.js?v=2026.11.11-4"></script>
-<script src="towns.js?v=2026.11.11-4"></script>
-<script src="data.js?v=2026.11.11-4"></script>
-<script src="roadlim.js?v=2026.11.11-4"></script>
-<script src="cameras.js?v=2026.11.11-4"></script>
-<script src="geometry.js?v=2026.11.11-4"></script>
-<script src="core.js?v=2026.11.11-4"></script>
-<script src="app.js?v=2026.11.11-4"></script>
-<script src="map.js?v=2026.11.11-4"></script>
-<script src="navcore.js?v=2026.11.11-4"></script>
-<script src="nav.js?v=2026.11.11-4"></script>
+<script src="lib/maplibre-gl.js?v=2026.11.13-1"></script>
+<script src="towns.js?v=2026.11.13-1"></script>
+<script src="data.js?v=2026.11.13-1"></script>
+<script src="roadlim.js?v=2026.11.13-1"></script>
+<script src="cameras.js?v=2026.11.13-1"></script>
+<script src="geometry.js?v=2026.11.13-1"></script>
+<script src="core.js?v=2026.11.13-1"></script>
+<script src="app.js?v=2026.11.13-1"></script>
+<script src="map.js?v=2026.11.13-1"></script>
+<script src="navcore.js?v=2026.11.13-1"></script>
+<script src="nav.js?v=2026.11.13-1"></script>
 </body>
 </html>

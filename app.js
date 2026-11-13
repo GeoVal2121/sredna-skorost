@@ -2,7 +2,7 @@
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
   // ---------- нова версия: ако телефонът е запазил стара, презарежда се автоматично ----------
-  var APP_VERSION = "2026.11.11-4";
+  var APP_VERSION = "2026.11.13-1";
   try {
     fetch("version.json?t=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
       if (j && j.v && j.v !== APP_VERSION && sessionStorage.getItem("ss_reload") !== j.v) {
@@ -15,7 +15,7 @@
     get: function (k, d) { try { var v = localStorage.getItem("ss_" + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
     set: function (k, v) { try { localStorage.setItem("ss_" + k, JSON.stringify(v)); } catch (e) { } }
   };
-  var cfg = Object.assign({ margin: 3, voice: true, beep: true, headUp: true, cams: true, roadLim: true }, store.get("cfg", {}));
+  var cfg = Object.assign({ margin: 3, voice: true, beep: true, headUp: true, cams: true, roadLim: true, theme: "auto" }, store.get("cfg", {}));
   var camWatch = new SSCore.CamWatch(window.SS_CAMS || []);
   var manual = store.get("manual", {});           // ръчни калибрации
   var osmCache = store.get("osm", null);          // { t, g:[[lat,lon]] }
@@ -226,9 +226,11 @@
 
   // тъмен режим след залез и до изгрев (по последната позиция или центъра на картата)
   var dark = null;
+  // фон: автоматично по залез/изгрев, или ръчно светъл/тъмен (плъзгане от отметката в десния край или от настройките)
+  var THEMES = { auto: "автоматичен (по залез и изгрев)", light: "светъл", dark: "тъмен" };
   function applyTheme() {
     var p = lastFix ? [lastFix.lat, lastFix.lon] : (window.SSMap && SSMap.center()) || [42.7, 23.32];
-    var d = SSCore.sunAlt(p[0], p[1], Date.now()) < -0.833;
+    var d = cfg.theme === "dark" ? true : cfg.theme === "light" ? false : SSCore.sunAlt(p[0], p[1], Date.now()) < -0.833;
     if (d === dark) return;
     dark = d;
     document.documentElement.classList.toggle("dark", d);
@@ -237,6 +239,20 @@
   }
   applyTheme();
   setInterval(applyTheme, 60000);
+  function setTheme(t) { cfg.theme = t; store.set("cfg", cfg); $("themeSel").value = t; applyTheme(); toast("Фон: " + THEMES[t]); }
+  $("themeSel").value = cfg.theme;
+  $("themeSel").onchange = function () { setTheme(this.value); };
+  // плъзгане наляво от отметката (поне 50 px) – обратния фон на текущия; докосване – подсказка
+  (function () {
+    var el = $("themeEdge"), x0 = null;
+    el.addEventListener("pointerdown", function (e) { x0 = e.clientX; el.classList.add("drag"); el.setPointerCapture(e.pointerId); e.stopPropagation(); });
+    el.addEventListener("pointerup", function (e) {
+      el.classList.remove("drag"); if (x0 === null) return;
+      var dx = x0 - e.clientX; x0 = null;
+      if (dx >= 50) setTheme(dark ? "light" : "dark"); else toast("Плъзнете наляво за смяна на фона");
+    });
+    el.addEventListener("pointercancel", function () { x0 = null; el.classList.remove("drag"); });
+  })();
 
   // ---------- OSM рамки ----------
   function loadOsm(manualClick) {
