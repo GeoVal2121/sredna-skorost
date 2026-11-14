@@ -1,0 +1,15 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const source=fs.readFileSync(require('node:path').join(__dirname,'../map.js'),'utf8');
+let click,pitch=0,pitchChanged;
+const compass={dataset:{},setAttribute(k,v){this[k]=v},addEventListener(type,fn,capture){assert.equal(type,'click');assert.equal(capture,true);click=fn}};
+const ctx={App:{cfg:{headUp:true}},map:{getContainer:()=>({querySelector:()=>compass}),getPitch:()=>pitch,on:(name,fn)=>{assert.equal(name,'pitch');pitchChanged=fn},easeTo:opts=>{pitch=opts.pitch;pitchChanged()}}};
+vm.createContext(ctx);
+vm.runInContext(source.slice(source.indexOf('  var selectedPitch'),source.indexOf('  var geoCache')),ctx);
+vm.runInContext(source.slice(source.indexOf('    // The existing compass'),source.indexOf('    // без интернет/плочки')),ctx);
+assert.equal(compass.dataset.view,'3D');
+const event={preventDefault(){},stopImmediatePropagation(){}};
+click(event);assert.equal(pitch,50);assert.equal(compass.dataset.view,'2D');assert.equal(ctx.targetPitch(),50);
+click(event);assert.equal(pitch,0);assert.equal(compass.dataset.view,'3D');assert.equal(ctx.targetPitch(),0);
+ctx.App.cfg.headUp=false;assert.equal(ctx.targetPitch(),0);
+assert(source.includes('pitch: targetPitch()'));assert(source.includes('(targetPitch() - map.getPitch())'));
+console.log('PASS: 3D/2D label, toggle, selected pitch respected by following and recentering');

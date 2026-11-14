@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
-<link rel="stylesheet" href="lib/maplibre-gl.css?v=2026.11.14-9">
+<link rel="stylesheet" href="lib/maplibre-gl.css?v=2026.11.14-11">
 <style>
 :root{--bg:#eef1f4;--panel:#fffffff2;--line:#d8dee6;--tx:#1f2933;--mut:#5f6b7a;--ok:#188038;--warn:#e37400;--bad:#d93025;--acc:#1a73e8;
   --st:env(safe-area-inset-top);--sb:env(safe-area-inset-bottom)}
@@ -75,7 +75,10 @@ button:active{transform:scale(.97)}
 .maplibregl-ctrl-attrib a{color:#333}
 .maplibregl-popup-content{background:#fff;color:var(--tx);border-radius:10px;font-size:13px;padding:10px 12px}
 .maplibregl-popup-close-button{color:#555;font-size:18px}
-.car{width:64px;height:64px}
+.car{width:64px;height:64px;isolation:isolate}
+.car::before{content:"";position:absolute;inset:2px;border-radius:50%;background:radial-gradient(circle,#b8e7ff99 0%,#7dccff66 38%,#7dccff00 72%);box-shadow:0 0 14px 3px #8bd5ff55;animation:location-glow 2.6s ease-in-out infinite;pointer-events:none;z-index:-1}
+@keyframes location-glow{0%,100%{transform:scale(.8);opacity:.45}50%{transform:scale(1.3);opacity:.9}}
+@media(prefers-reduced-motion:reduce){.car::before{animation:none;transform:scale(1);opacity:.55}}
 /* листове */
 .sheet{position:fixed;inset:0;background:#0006;display:none;align-items:flex-end;z-index:5}
 .sheet.show{display:flex}
@@ -147,6 +150,9 @@ html:not(.dark) .side #themeToggle{background:#1e2740;border-color:#3d4a6b;color
 /* компас: бялото сочи север, червеното – юг */
 .maplibregl-ctrl button.maplibregl-ctrl-compass .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2229%22%20height%3D%2229%22%20viewBox%3D%220%200%2029%2029%22%3E%3Cpath%20d%3D%22M14.5%203.5%209.5%2014.5h10z%22%20fill%3D%22%23fff%22%20stroke%3D%22%233c4043%22%20stroke-width%3D%221.2%22%20stroke-linejoin%3D%22round%22/%3E%3Cpath%20d%3D%22M9.5%2014.5h10l-5%2011z%22%20fill%3D%22%23d93025%22%20stroke%3D%22%23a50e0e%22%20stroke-width%3D%221.2%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E")!important}
 html.dark .maplibregl-ctrl-compass .maplibregl-ctrl-icon{filter:none}
+.maplibregl-ctrl-compass{position:relative}
+.maplibregl-ctrl button.maplibregl-ctrl-compass .maplibregl-ctrl-icon{height:27px;background-size:20px 20px}
+.maplibregl-ctrl-compass::after{content:attr(data-view);position:absolute;bottom:2px;left:0;right:0;font-size:10px;line-height:11px;font-weight:700;color:var(--tx);pointer-events:none}
 html.dark [class*=popup-anchor-bottom] .maplibregl-popup-tip{border-top-color:#26314f}
 html.dark [class*=popup-anchor-top] .maplibregl-popup-tip{border-bottom-color:#26314f}
 html.dark .maplibregl-popup-anchor-left .maplibregl-popup-tip{border-right-color:#26314f}
@@ -248,16 +254,16 @@ html.dark .maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color
 
 <div class="toast" id="toast"></div>
 
-<script src="lib/maplibre-gl.js?v=2026.11.14-9"></script>
-<script src="towns.js?v=2026.11.14-9"></script>
-<script src="data.js?v=2026.11.14-9"></script>
-<script src="roadlim.js?v=2026.11.14-9"></script>
-<script src="cameras.js?v=2026.11.14-9"></script>
-<script src="geometry.js?v=2026.11.14-9"></script>
-<script src="core.js?v=2026.11.14-9"></script>
-<script src="app.js?v=2026.11.14-9"></script>
-<script src="map.js?v=2026.11.14-9"></script>
-<script src="navcore.js?v=2026.11.14-9"></script>
-<script src="nav.js?v=2026.11.14-9"></script>
+<script src="lib/maplibre-gl.js?v=2026.11.14-11"></script>
+<script src="towns.js?v=2026.11.14-11"></script>
+<script src="data.js?v=2026.11.14-11"></script>
+<script src="roadlim.js?v=2026.11.14-11"></script>
+<script src="cameras.js?v=2026.11.14-11"></script>
+<script src="geometry.js?v=2026.11.14-11"></script>
+<script src="core.js?v=2026.11.14-11"></script>
+<script src="app.js?v=2026.11.14-11"></script>
+<script src="map.js?v=2026.11.14-11"></script>
+<script src="navcore.js?v=2026.11.14-11"></script>
+<script src="nav.js?v=2026.11.14-11"></script>
 </body>
 </html>

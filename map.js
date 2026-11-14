@@ -5,6 +5,8 @@
   var map = null, ready = false, follow = true, track = [], car = null, carEl = null;
   var heading = 0, lastP = null, lastActiveId = null, offline = false, handlers = false;
   var routeLine = null, destMarker = null, touching = false, refollowT = null, userZoomUntil = 0, pressT = null, pressXY = null;
+  var selectedPitch = null;
+  function targetPitch() { return selectedPitch == null ? (App.cfg.headUp ? 50 : 0) : selectedPitch; }
   var geoCache = {}, isDark = !!App.isDark(), fallback = null;
   function styleUrl(d) { return "https://tiles.openfreemap.org/styles/" + (d ? "fiord" : "liberty"); }
   // смяна светло/тъмно: новият стил минава пак през style.load и слоевете ни се добавят наново
@@ -66,6 +68,21 @@
       });
     } catch (e) { App.toast("Картата не се поддържа от този браузър."); return; }
     map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }), "top-right");
+    // The existing compass also switches the view; following must respect this selection.
+    var compass = map.getContainer().querySelector(".maplibregl-ctrl-compass");
+    function updateViewLabel() {
+      var next = map.getPitch() > 25 ? "2D" : "3D";
+      compass.dataset.view = next;
+      compass.title = "Превключи към " + next + ". Плъзни компаса за завъртане.";
+      compass.setAttribute("aria-label", "Превключи към " + next + " изглед");
+    }
+    compass.addEventListener("click", function (e) {
+      e.preventDefault(); e.stopImmediatePropagation();
+      selectedPitch = map.getPitch() > 25 ? 0 : 50;
+      map.easeTo({ pitch: selectedPitch, duration: 450 });
+    }, true);
+    map.on("pitch", updateViewLabel);
+    updateViewLabel();
     // без интернет/плочки: празен тъмен фон, но рамките, отсечките и пътят пак се виждат
     fallback = function () { return { version: 8, sources: {}, layers: [{ id: "bg", type: "background", paint: { "background-color": isDark ? "#2b3550" : "#eef1f4" } }] }; };
     var fbTimer = setTimeout(function () { if (!ready) { offline = true; map.setStyle(fallback()); } }, 15000);
@@ -235,7 +252,7 @@
       var up = App.cfg.headUp, moving = App.tracker().speed > 8;
       if (camBearing == null) camBearing = map.getBearing();
       camBearing = up ? (moving ? lerpAngle(camBearing, c.h, 0.12) : camBearing) : lerpAngle(camBearing, 0, 0.12);
-      var opt = { center: [c.p[1], c.p[0]], bearing: camBearing, pitch: map.getPitch() + ((up ? 50 : 0) - map.getPitch()) * 0.1, padding: pad() };
+      var opt = { center: [c.p[1], c.p[0]], bearing: camBearing, pitch: map.getPitch() + (targetPitch() - map.getPitch()) * 0.1, padding: pad() };
       var z = map.getZoom();
       if (z < 12) opt.zoom = 15;
       else if (window.SSNav && SSNav.active() && Date.now() > userZoomUntil) {
@@ -330,7 +347,7 @@
     if (!map || !anim.to) return;
     var c = animPos(performance.now()), up = App.cfg.headUp;
     camBearing = up ? c.h : 0; easing = true;
-    map.easeTo({ center: [c.p[1], c.p[0]], bearing: camBearing, pitch: up ? 50 : 0, zoom: Math.max(map.getZoom(), 15), padding: pad(), duration: 600 });
+    map.easeTo({ center: [c.p[1], c.p[0]], bearing: camBearing, pitch: targetPitch(), zoom: Math.max(map.getZoom(), 15), padding: pad(), duration: 600 });
     map.once("moveend", function () { easing = false; if (!raf) raf = requestAnimationFrame(frame); });
   }
 
