@@ -2,7 +2,7 @@
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
   // ---------- нова версия: ако телефонът е запазил стара, презарежда се автоматично ----------
-  var APP_VERSION = "2026.11.14-7";
+  var APP_VERSION = "2026.11.14-8";
   try {
     fetch("version.json?t=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
       if (j && j.v && j.v !== APP_VERSION && sessionStorage.getItem("ss_reload") !== j.v) {
@@ -224,13 +224,17 @@
 
   // тъмен режим след залез и до изгрев (по последната позиция или центъра на картата)
   var dark = null;
-  // фон: автоматично по залез/изгрев, или ръчно светъл/тъмен (плъзгане от отметката в десния край или от настройките)
+  // фон: автоматично по залез/изгрев, или ръчно светъл/тъмен (от отметката слънце/луна или от настройките)
   var THEMES = { auto: "автоматичен (по залез и изгрев)", light: "светъл", dark: "тъмен" };
   function applyTheme() {
     var p = lastFix ? [lastFix.lat, lastFix.lon] : (window.SSMap && SSMap.center()) || [42.7, 23.32];
     var d = cfg.theme === "dark" ? true : cfg.theme === "light" ? false : SSCore.sunAlt(p[0], p[1], Date.now()) < -0.833;
     if (d === dark) return;
     dark = d;
+    var toggle = $("themeToggle");
+    toggle.textContent = d ? "☀️" : "🌙";
+    toggle.title = d ? "Светла тема" : "Тъмна тема";
+    toggle.setAttribute("aria-label", toggle.title);
     document.documentElement.classList.toggle("dark", d);
     var m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = d ? "#1e2740" : "#ffffff";
     if (window.SSMap && SSMap.setTheme) SSMap.setTheme(d);
@@ -240,17 +244,7 @@
   function setTheme(t) { cfg.theme = t; store.set("cfg", cfg); $("themeSel").value = t; applyTheme(); toast("Фон: " + THEMES[t]); }
   $("themeSel").value = cfg.theme;
   $("themeSel").onchange = function () { setTheme(this.value); };
-  // плъзгане наляво от отметката (поне 50 px) – обратния фон на текущия; докосване – подсказка
-  (function () {
-    var el = $("themeEdge"), x0 = null;
-    el.addEventListener("pointerdown", function (e) { x0 = e.clientX; el.classList.add("drag"); el.setPointerCapture(e.pointerId); e.stopPropagation(); });
-    el.addEventListener("pointerup", function (e) {
-      el.classList.remove("drag"); if (x0 === null) return;
-      var dx = x0 - e.clientX; x0 = null;
-      if (dx >= 50) setTheme(dark ? "light" : "dark"); else toast("Плъзнете наляво за смяна на фона");
-    });
-    el.addEventListener("pointercancel", function () { x0 = null; el.classList.remove("drag"); });
-  })();
+  $("themeToggle").onclick = function () { setTheme(dark ? "light" : "dark"); };
 
   // ---------- точни рамки ----------
   function osmChip() {
@@ -384,7 +378,7 @@
   $("testVoice").onclick = function () { unlockAudio(); beep(1); say("След 500 метра завийте надясно. Начало на отсечка Чирпан – Памукчии, ограничение 140.", true); };
   $("voiceSel").onchange = function () { cfg.voiceName = this.value || null; store.set("cfg", cfg); say("Здравейте. Това е гласът за навигация.", true); };
   loadVoices();
-  if (store.get("intro", 0)) $("intro").classList.remove("show");
+  if (store.get("intro", 0)) { $("intro").classList.remove("show"); }
 
   window.SSApp = { model: function () { return model; }, tracker: function () { return tracker; }, cfg: cfg, toast: toast, say: say,
     mapCenter: function () { return window.SSMap ? SSMap.center() : null; },
