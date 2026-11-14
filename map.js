@@ -86,15 +86,15 @@
         paint: { "line-color": "#1557b0", "line-width": 11, "line-opacity": 0.9 } });
       addBelow({ id: "route", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" },
         paint: { "line-color": "#4b8ef5", "line-width": 7 } });
-      // предстоящите (още непуснати) отсечки: бледа сива прекъсната линия – да не се бъркат с работещите (ярко оранжеви)
+      // предстоящите (още непуснати) отсечки: сива прекъсната линия; работещите – ярко оранжеви
       addBelow({ id: "secs-up", type: "line", source: "secs", filter: ["all", ["==", ["get", "up"], 1], ["!=", ["get", "act"], 1]],
-        paint: { "line-color": isDark ? "#8f99b3" : "#b3b9c0", "line-dasharray": [1.2, 1], "line-opacity": 0.7,
-          "line-width": ["interpolate", ["linear"], ["zoom"], 10, 5, 14, 8, 17, 18] } });
+        paint: { "line-color": isDark ? "#a3abbd" : "#8a9099", "line-dasharray": [2, 1], "line-opacity": 1,
+          "line-width": ["interpolate", ["linear"], ["zoom"], 10, 6, 14, 10, 17, 22] } });
       addBelow({ id: "secs", type: "line", source: "secs", layout: { "line-cap": "round" }, filter: ["any", ["!=", ["get", "up"], 1], ["==", ["get", "act"], 1]],
         // на тъмен фон – по-ярки и непрозрачни, иначе оранжевото изглежда кафяво
-        paint: { "line-color": ["case", ["==", ["get", "act"], 1], isDark ? "#ff5a4f" : "#d93025", isDark ? "#ffa726" : "#e8710a"],
+        paint: { "line-color": ["case", ["==", ["get", "act"], 1], isDark ? "#ff5a4f" : "#d93025", isDark ? "#ffa726" : "#ff6d00"],
           "line-width": ["interpolate", ["linear"], ["zoom"], 10, ["case", ["==", ["get", "act"], 1], 8, 6],
-            14, ["case", ["==", ["get", "act"], 1], 12, 10], 17, ["case", ["==", ["get", "act"], 1], 26, 22]], "line-opacity": isDark ? 0.95 : 0.75 } });
+            14, ["case", ["==", ["get", "act"], 1], 12, 10], 17, ["case", ["==", ["get", "act"], 1], 26, 22]], "line-opacity": isDark ? 0.95 : 0.9 } });
       addBelow({ id: "trk", type: "line", source: "trk", layout: { "line-cap": "round", "line-join": "round" },
         paint: { "line-color": isDark ? "#8c95ab" : "#9aa0a6", "line-width": 5, "line-opacity": 0.8 } });
       // стационарни камери: икона + ограничение
