@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-gantry-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icon-gantry-180.png">
-<link rel="stylesheet" href="lib/maplibre-gl.css?v=2026.11.14-13">
+<link rel="stylesheet" href="lib/maplibre-gl.css?v=2026.11.14-14">
 <style>
 :root{--bg:#eef1f4;--panel:#fffffff2;--line:#d8dee6;--tx:#1f2933;--mut:#5f6b7a;--ok:#188038;--warn:#e37400;--bad:#d93025;--acc:#1a73e8;
   --st:env(safe-area-inset-top);--sb:env(safe-area-inset-bottom)}
@@ -55,6 +55,7 @@ button:active{transform:scale(.97)}
 /* дясна колона */
 .side{position:fixed;right:10px;bottom:calc(var(--sb) + 86px);z-index:3;display:flex;flex-direction:column;gap:8px}
 .side button{width:50px;height:50px;padding:0;border-radius:50%;font-size:20px;display:grid;place-items:center;background:var(--panel);box-shadow:0 2px 8px #0003}
+.side #shareBtn{position:absolute;right:58px;bottom:3px;width:44px;height:44px;border-radius:50%;color:var(--mut)}
 #center{position:relative;isolation:isolate}
 #center.off{color:var(--acc);border-color:var(--acc)}
 /* долна лента */
@@ -191,6 +192,7 @@ html.dark .maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color
 <div class="side">
   <button id="center" aria-label="Центрирай">◎</button>
   <button id="themeToggle" type="button" aria-label="Смяна на темата">🌙</button>
+  <button id="shareBtn" type="button" aria-label="Сподели приложението" title="Сподели приложението"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m8 10 8-5M8 14l8 5"/><circle cx="5" cy="12" r="3"/><circle cx="19" cy="4" r="3"/><circle cx="19" cy="20" r="3"/></svg></button>
   <button id="setBtn" aria-label="Настройки">☰</button>
 </div>
 
@@ -255,16 +257,16 @@ html.dark .maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color
 
 <div class="toast" id="toast"></div>
 
-<script src="lib/maplibre-gl.js?v=2026.11.14-13"></script>
-<script src="towns.js?v=2026.11.14-13"></script>
-<script src="data.js?v=2026.11.14-13"></script>
-<script src="roadlim.js?v=2026.11.14-13"></script>
-<script src="cameras.js?v=2026.11.14-13"></script>
-<script src="geometry.js?v=2026.11.14-13"></script>
-<script src="core.js?v=2026.11.14-13"></script>
-<script src="app.js?v=2026.11.14-13"></script>
-<script src="map.js?v=2026.11.14-13"></script>
-<script src="navcore.js?v=2026.11.14-13"></script>
-<script src="nav.js?v=2026.11.14-13"></script>
+<script src="lib/maplibre-gl.js?v=2026.11.14-14"></script>
+<script src="towns.js?v=2026.11.14-14"></script>
+<script src="data.js?v=2026.11.14-14"></script>
+<script src="roadlim.js?v=2026.11.14-14"></script>
+<script src="cameras.js?v=2026.11.14-14"></script>
+<script src="geometry.js?v=2026.11.14-14"></script>
+<script src="core.js?v=2026.11.14-14"></script>
+<script src="app.js?v=2026.11.14-14"></script>
+<script src="map.js?v=2026.11.14-14"></script>
+<script src="navcore.js?v=2026.11.14-14"></script>
+<script src="nav.js?v=2026.11.14-14"></script>
 </body>
 </html>

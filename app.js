@@ -2,7 +2,7 @@
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
   // ---------- нова версия: ако телефонът е запазил стара, презарежда се автоматично ----------
-  var APP_VERSION = "2026.11.14-13";
+  var APP_VERSION = "2026.11.14-14";
   try {
     fetch("version.json?t=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
       if (j && j.v && j.v !== APP_VERSION && sessionStorage.getItem("ss_reload") !== j.v) {
@@ -362,6 +362,15 @@
   // ---------- връзки ----------
   $("go").onclick = function () { (watchId != null || demoTimer) ? stop() : start(); };
   $("cal").onclick = calibrate;
+  $("shareBtn").onclick = async function () {
+    var url = "https://sredna-skorost.netlify.app/";
+    if (navigator.share) {
+      try { await navigator.share({ title: "Средна скорост", url: url }); return; }
+      catch (e) { if (e.name === "AbortError") return; }
+    }
+    try { await navigator.clipboard.writeText(url); toast("Връзката е копирана."); }
+    catch (e) { window.prompt("Копирай връзката към приложението:", url); }
+  };
   $("setBtn").onclick = function () { $("sheet").classList.add("show"); };
   $("closeSet").onclick = function () { $("sheet").classList.remove("show"); };
   $("introOk").onclick = function () { $("intro").classList.remove("show"); store.set("intro", 1); unlockAudio(); };
