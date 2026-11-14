@@ -2,7 +2,7 @@
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
   // ---------- нова версия: ако телефонът е запазил стара, презарежда се автоматично ----------
-  var APP_VERSION = "2026.11.14-1";
+  var APP_VERSION = "2026.11.14-2";
   try {
     fetch("version.json?t=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
       if (j && j.v && j.v !== APP_VERSION && sessionStorage.getItem("ss_reload") !== j.v) {
@@ -18,11 +18,10 @@
   var cfg = Object.assign({ margin: 3, voice: true, beep: true, headUp: true, cams: true, roadLim: true, theme: "auto" }, store.get("cfg", {}));
   var camWatch = new SSCore.CamWatch(window.SS_CAMS || []);
   var manual = store.get("manual", {});           // ръчни калибрации
-  var osmCache = store.get("osm", null);          // { t, g:[[lat,lon]] }
   var model, tracker, watchId = null, wake = null, demoTimer = null, lastFix = null;
 
   function overrides() {
-    var o = osmCache ? SSCore.snapToGantries(SS_DATA, osmCache.g) : {};
+    var o = {};
     for (var k in manual) o[k] = { p: manual[k], src: "manual" };
     return o;
   }
@@ -31,7 +30,7 @@
       model = SSCore.buildModel(SS_DATA, overrides());
       tracker = new SSCore.Tracker(model, { margin: +cfg.margin });
     } else { // обновява точките на място, без да прекъсва текущата отсечка
-      for (var k in model.points) { model.points[k].p = SS_DATA.points[k]; model.points[k].src = "approx"; }
+      for (var k in model.points) { model.points[k].p = SS_DATA.points[k]; model.points[k].src = (SS_DATA.exact || []).indexOf(k) >= 0 ? "osm" : "approx"; }
       SSCore.applyOverrides(model.points, overrides());
     }
     osmChip(); renderList();
@@ -193,7 +192,6 @@
     keepAwake();
     $("go").textContent = "Стоп"; $("go").classList.add("on");
     $("nearest").textContent = "Търся GPS сигнал…";
-    if (!osmCache || Date.now() - osmCache.t > 30 * 864e5) loadOsm(false);
   }
   function stop() {
     if (watchId != null) navigator.geolocation.clearWatch(watchId);
@@ -254,23 +252,7 @@
     el.addEventListener("pointercancel", function () { x0 = null; el.classList.remove("drag"); });
   })();
 
-  // ---------- OSM рамки ----------
-  function loadOsm(manualClick) {
-    $("osm").textContent = "OSM…";
-    var q = '[out:json][timeout:60];node["highway"="toll_gantry"](41.2,22.3,44.25,28.65);out skel;';
-    fetch("https://overpass-api.de/api/interpreter", {
-      method: "POST", body: "data=" + encodeURIComponent(q),
-      headers: { "Content-Type": "application/x-www-form-urlencoded" }
-    }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(function (j) {
-        var g = (j.elements || []).map(function (n) { return [n.lat, n.lon]; });
-        if (!g.length) throw new Error("empty");
-        osmCache = { t: Date.now(), g: g }; store.set("osm", osmCache);
-        rebuild();
-        if (manualClick) toast("Заредени " + g.length + " тол рамки от OpenStreetMap.");
-      })
-      .catch(function () { osmChip(); if (manualClick) toast("OSM не е достъпен. Ползват се приблизителни точки."); });
-  }
+  // ---------- точни рамки ----------
   function osmChip() {
     var n = 0, total = 0, k;
     for (k in model.points) { total++; if (model.points[k].src !== "approx") n++; }
@@ -397,7 +379,6 @@
   $("margin").onchange = function () { cfg.margin = +this.value; tracker.margin = cfg.margin; store.set("cfg", cfg); };
   $("voice").onchange = function () { cfg.voice = this.checked; store.set("cfg", cfg); };
   $("beep").onchange = function () { cfg.beep = this.checked; store.set("cfg", cfg); };
-  $("osmBtn").onclick = function () { loadOsm(true); };
   $("clrBtn").onclick = function () { dialog("Изтриване на калибрациите", "Ще бъдат изтрити " + Object.keys(manual).length + " ръчно записани рамки.", function () { manual = {}; store.set("manual", manual); rebuild(); }); };
   $("demoBtn").onclick = function () { $("sheet").classList.remove("show"); demo(); };
   $("testVoice").onclick = function () { unlockAudio(); beep(1); say("След 500 метра завийте надясно. Начало на отсечка Чирпан – Памукчии, ограничение 140.", true); };
