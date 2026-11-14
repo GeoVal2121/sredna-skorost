@@ -65,5 +65,5 @@ for(const m of html.matchAll(/(?:src|href)="([^"]+)"/g)) {
   const asset=m[1].split("?")[0];
   if(!/^(https?:|#|data:)/.test(asset)) assert(fs.existsSync(path.join(__dirname,"..",asset)),`missing asset ${asset}`);
 }
-assert.equal(JSON.parse(fs.readFileSync(path.join(__dirname,"../version.json"),"utf8")).v,"2026.11.14-6");
+assert.equal(JSON.parse(fs.readFileSync(path.join(__dirname,"../version.json"),"utf8")).v,"2026.11.14-7");
 console.log("PASS: 43 road corridors; 86 endpoints; mapped gantries; 32 official endpoints; 8 negative regressions; assets; version");

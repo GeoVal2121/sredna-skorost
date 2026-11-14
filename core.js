@@ -10,6 +10,13 @@
     return 2 * R * Math.asin(Math.min(1, Math.sqrt(h)));
   }
 
+  // Explicit published section length takes precedence over road chainage subtraction.
+  function sectionLength(r) {
+    if (r[8] == null) return Math.abs(r[4] - r[2]);
+    if (!Number.isFinite(r[8]) || r[8] <= 0) throw new Error("Invalid section length");
+    return r[8] / 1000;
+  }
+
   // overrides: { "T:Чирпан": { p:[lat,lon], src:"osm"|"manual" } }
   function buildModel(data, overrides) {
     var points = {}, sections = [], k;
@@ -17,7 +24,7 @@
     for (k in data.points) points[k] = { key: k, p: data.points[k], src: (data.official || []).indexOf(k) >= 0 ? "bgtoll" : exact[k] ? "osm" : "approx" };
     applyOverrides(points, overrides);
     data.sections.forEach(function (r, i) {
-      var road = r[0], a = road + ":" + r[1], b = road + ":" + r[3], L = Math.abs(r[4] - r[2]);
+      var road = r[0], a = road + ":" + r[1], b = road + ":" + r[3], L = sectionLength(r);
       var base = { road: road, roadName: data.roads[road], L: L, limit: r[5] };
       if (r[6] !== "-") sections.push(Object.assign({ id: i + "f", from: r[1], to: r[3], fromKey: a, toKey: b, upcoming: r[6] === "u" }, base));
       if (r[7] !== "-") sections.push(Object.assign({ id: i + "r", from: r[3], to: r[1], fromKey: b, toKey: a, upcoming: r[7] === "u" }, base));
@@ -44,7 +51,7 @@
     }
     var bad = {};
     data.sections.forEach(function (r) {
-      var a = r[0] + ":" + r[1], b = r[0] + ":" + r[3], Lm = Math.abs(r[4] - r[2]) * 1000;
+      var a = r[0] + ":" + r[1], b = r[0] + ":" + r[3], Lm = sectionLength(r) * 1000;
       var pa = cand[a] || data.points[a], pb = cand[b] || data.points[b];
       var slack = (cand[a] && cand[b]) ? 300 : maxM; // и двата края уточнени → строга проверка
       var d = dist(pa, pb);
