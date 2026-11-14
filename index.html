@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon.svg">
-<link rel="stylesheet" href="lib/maplibre-gl.css?v=2026.11.14-8">
+<link rel="stylesheet" href="lib/maplibre-gl.css?v=2026.11.14-9">
 <style>
 :root{--bg:#eef1f4;--panel:#fffffff2;--line:#d8dee6;--tx:#1f2933;--mut:#5f6b7a;--ok:#188038;--warn:#e37400;--bad:#d93025;--acc:#1a73e8;
   --st:env(safe-area-inset-top);--sb:env(safe-area-inset-bottom)}
@@ -143,6 +143,7 @@ html.dark .maplibregl-ctrl-attrib{background:#26314fcc!important;color:#a3adb8}
 html.dark .maplibregl-ctrl-attrib a{color:#c8ccd0}
 html.dark .maplibregl-ctrl-icon{filter:invert(1)}
 .side #themeToggle{width:28px;height:32px;align-self:flex-end;margin-right:11px;border-radius:10px;font-size:17px;line-height:1}
+html:not(.dark) .side #themeToggle{background:#1e2740;border-color:#3d4a6b;color:#fff}
 /* компас: бялото сочи север, червеното – юг */
 .maplibregl-ctrl button.maplibregl-ctrl-compass .maplibregl-ctrl-icon{background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2229%22%20height%3D%2229%22%20viewBox%3D%220%200%2029%2029%22%3E%3Cpath%20d%3D%22M14.5%203.5%209.5%2014.5h10z%22%20fill%3D%22%23fff%22%20stroke%3D%22%233c4043%22%20stroke-width%3D%221.2%22%20stroke-linejoin%3D%22round%22/%3E%3Cpath%20d%3D%22M9.5%2014.5h10l-5%2011z%22%20fill%3D%22%23d93025%22%20stroke%3D%22%23a50e0e%22%20stroke-width%3D%221.2%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E")!important}
 html.dark .maplibregl-ctrl-compass .maplibregl-ctrl-icon{filter:none}
@@ -247,16 +248,16 @@ html.dark .maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color
 
 <div class="toast" id="toast"></div>
 
-<script src="lib/maplibre-gl.js?v=2026.11.14-8"></script>
-<script src="towns.js?v=2026.11.14-8"></script>
-<script src="data.js?v=2026.11.14-8"></script>
-<script src="roadlim.js?v=2026.11.14-8"></script>
-<script src="cameras.js?v=2026.11.14-8"></script>
-<script src="geometry.js?v=2026.11.14-8"></script>
-<script src="core.js?v=2026.11.14-8"></script>
-<script src="app.js?v=2026.11.14-8"></script>
-<script src="map.js?v=2026.11.14-8"></script>
-<script src="navcore.js?v=2026.11.14-8"></script>
-<script src="nav.js?v=2026.11.14-8"></script>
+<script src="lib/maplibre-gl.js?v=2026.11.14-9"></script>
+<script src="towns.js?v=2026.11.14-9"></script>
+<script src="data.js?v=2026.11.14-9"></script>
+<script src="roadlim.js?v=2026.11.14-9"></script>
+<script src="cameras.js?v=2026.11.14-9"></script>
+<script src="geometry.js?v=2026.11.14-9"></script>
+<script src="core.js?v=2026.11.14-9"></script>
+<script src="app.js?v=2026.11.14-9"></script>
+<script src="map.js?v=2026.11.14-9"></script>
+<script src="navcore.js?v=2026.11.14-9"></script>
+<script src="nav.js?v=2026.11.14-9"></script>
 </body>
 </html>
