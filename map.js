@@ -15,7 +15,7 @@
     ready = false;
     map.setStyle(offline ? fallback() : styleUrl(d), { diff: false });
   }
-  var COL = { approx: "#f29900", osm: "#1a73e8", manual: "#188038" };
+  var COL = { approx: "#f29900", osm: "#1a73e8", bgtoll: "#1a73e8", manual: "#188038" };
 
   function pointsGeo() {
     var m = App.model(), km = {}, f = [];
@@ -113,7 +113,7 @@
       if (handlers) { ready = true; refresh(); return; }
       handlers = true;
       map.on("click", "pts", function (e) {
-        var p = e.features[0].properties, srcT = p.src === "approx" ? "приблизителна (по населеното място)" : p.src === "osm" ? "от OpenStreetMap" : "калибрирана от теб";
+        var p = e.features[0].properties, srcT = p.src === "approx" ? "приблизителна (по населеното място)" : p.src === "osm" ? "от OpenStreetMap" : p.src === "bgtoll" ? "от официалната карта на BG TOLL" : "калибрирана от теб";
         new maplibregl.Popup({ offset: 10 }).setLngLat(e.lngLat)
           .setHTML("<b>" + p.name + "</b><br>" + p.road + (p.km != null ? ", км " + String(p.km).replace(".", ",") : "") + "<br><span style='color:#5f6b7a'>Позиция: " + srcT + "</span>").addTo(map);
       });

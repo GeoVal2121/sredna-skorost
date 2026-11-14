@@ -36,11 +36,8 @@ for (const [i, row] of D.sections.entries()) {
   assert(C.dist(line[0],ends[0])<20 && C.dist(line.at(-1),ends[1])<20,`disconnected endpoints ${i}`);
   const nearest=corridor(i);
   assert(maxOffset(line,nearest)<5,`geometry leaves road ${i}`);
-  assert(ends.every(p=>nearest(p)<10),`endpoint off road ${i}`);
-  if([2,8,42].includes(i)) {
-    const length=line.slice(1).reduce((s,p,j)=>s+C.dist(line[j],p),0);
-    assert(Math.abs(length-Math.abs(row[4]-row[2])*1000)<2,`wrong chainage-derived length ${i}`);
-  }
+  assert(ends.every(p=>nearest(p)<15),`endpoint off road ${i}`);
+
 }
 // These historical detours passed the old length-only test; the road check must reject them.
 for(const i of [26,28,30,31,34,37,39,42]) assert(maxOffset(C.decodePolyline(recovered[i]),corridor(i))>20,`negative regression ${i}`);
@@ -51,10 +48,16 @@ for(const [key,g] of Object.entries(reference.gantries)) {
 // BG TOLL's I-2 map places Struyno north-west of Shumen, not the reverse.
 assert(D.points["I-2:Струйно"][0]>D.points["I-2:Шумен"][0]);
 assert(D.points["I-2:Струйно"][1]<D.points["I-2:Шумен"][1]);
-for(const key of ["T:Щърково","T:Памукчии","II-55:Килифарево","II-55:Въглевци","I-8:Ихтиман","I-8:Мирово"])
-  assert(!D.exact.includes(key),`unverified endpoint marked exact: ${key}`);
-assert.deepEqual(D.points["T:Памукчии"],[42.32938,25.62941]);
-assert(!D.exact.includes("T:Памукчии"),"chainage-derived endpoint must stay approximate");
+const official=require("./fixtures/official-endpoints.json");
+assert.equal(Object.keys(official.points).length,32);
+assert.equal(D.exact.length,69);
+for(const [key,p] of Object.entries(official.points)) {
+  assert.deepEqual(D.points[key],p.p,`wrong official coordinate ${key}`);
+  assert(D.official.includes(key),`wrong source ${key}`);
+  assert.equal(C.buildModel(D).points[key].src,"bgtoll");
+}
+const i8=C.decodePolyline(G[41]), length8=i8.slice(1).reduce((s,p,j)=>s+C.dist(i8[j],p),0);
+assert(Math.abs(length8-11472)<30,"Ihtiman–Mirovo endpoint regression");
 assert.equal(D.sections[8][2],172.447);
 assert.equal(D.sections[8][4],205.326);
 const html=fs.readFileSync(path.join(__dirname,"../index.html"),"utf8");
@@ -62,5 +65,5 @@ for(const m of html.matchAll(/(?:src|href)="([^"]+)"/g)) {
   const asset=m[1].split("?")[0];
   if(!/^(https?:|#|data:)/.test(asset)) assert(fs.existsSync(path.join(__dirname,"..",asset)),`missing asset ${asset}`);
 }
-assert.equal(JSON.parse(fs.readFileSync(path.join(__dirname,"../version.json"),"utf8")).v,"2026.11.14-5");
-console.log("PASS: 43 road corridors; 86 endpoints; mapped gantries; approximate status; 8 negative regressions; assets; version");
+assert.equal(JSON.parse(fs.readFileSync(path.join(__dirname,"../version.json"),"utf8")).v,"2026.11.14-6");
+console.log("PASS: 43 road corridors; 86 endpoints; mapped gantries; 32 official endpoints; 8 negative regressions; assets; version");

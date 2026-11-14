@@ -2,7 +2,7 @@
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
   // ---------- нова версия: ако телефонът е запазил стара, презарежда се автоматично ----------
-  var APP_VERSION = "2026.11.14-5";
+  var APP_VERSION = "2026.11.14-6";
   try {
     fetch("version.json?t=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
       if (j && j.v && j.v !== APP_VERSION && sessionStorage.getItem("ss_reload") !== j.v) {
@@ -30,7 +30,7 @@
       model = SSCore.buildModel(SS_DATA, overrides());
       tracker = new SSCore.Tracker(model, { margin: +cfg.margin });
     } else { // обновява точките на място, без да прекъсва текущата отсечка
-      for (var k in model.points) { model.points[k].p = SS_DATA.points[k]; model.points[k].src = (SS_DATA.exact || []).indexOf(k) >= 0 ? "osm" : "approx"; }
+      for (var k in model.points) { model.points[k].p = SS_DATA.points[k]; model.points[k].src = (SS_DATA.official || []).indexOf(k) >= 0 ? "bgtoll" : (SS_DATA.exact || []).indexOf(k) >= 0 ? "osm" : "approx"; }
       SSCore.applyOverrides(model.points, overrides());
     }
     osmChip(); renderList();
@@ -306,7 +306,7 @@
   function renderList() {
     $("cnt").textContent = model.sections.length + " направления";
     $("upd").textContent = SS_DATA.updated.split("-").reverse().join(".");
-    var tag = function (k) { var s = model.points[k].src; return "<span class='tag " + s + "'>" + (s === "approx" ? "≈" : s === "osm" ? "OSM" : "✓") + "</span>"; };
+    var tag = function (k) { var s = model.points[k].src; return "<span class='tag " + s + "'>" + (s === "approx" ? "≈" : s === "osm" ? "OSM" : s === "bgtoll" ? "НТУ" : "✓") + "</span>"; };
     $("list").innerHTML = model.sections.map(function (s) {
       return "<div><span>" + s.roadName + ": " + tag(s.fromKey) + " " + s.from + " → " + s.to + " " + tag(s.toKey) +
         (s.upcoming ? " <span class='tag u'>предстояща</span>" : "") + "</span><span class='mut'>" + s.L.toFixed(1).replace(".", ",") + " км · " + s.limit + "</span></div>";
