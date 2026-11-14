@@ -67,6 +67,7 @@
         center: [25.4, 42.7], zoom: 6.2, attributionControl: { compact: true }, maxPitch: 60
       });
     } catch (e) { App.toast("Картата не се поддържа от този браузър."); return; }
+    if (window.ResizeObserver) new ResizeObserver(function () { map.resize(); }).observe($("map"));
     map.addControl(new maplibregl.NavigationControl({ showCompass: true, visualizePitch: true }), "top-right");
     // The existing compass also switches the view; following must respect this selection.
     var compass = map.getContainer().querySelector(".maplibregl-ctrl-compass");

@@ -22,7 +22,10 @@
     $("srch").classList.add("show"); $("q").value = ""; setMode("free");
     setTimeout(function () { $("q").focus(); }, 50);
   }
-  function closeSearch() { $("srch").classList.remove("show"); $("q").blur(); }
+  function closeSearch() {
+    if ($("srch").contains(document.activeElement)) document.activeElement.blur();
+    $("srch").classList.remove("show");
+  }
   function label(f) { return NC.fmtPhoton(f.properties); }
   var ICO = { place: "◉", street: "═", addr: "№", poi: "●" };
   function townOf(p) { return p.city || p.town || p.village || (p.state === "София-град" ? "София" : ""); }

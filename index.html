@@ -3,24 +3,30 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Средна скорост">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#ffffff">
 <title>Средна скорост</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-gantry-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icon-gantry-180.png">
-<link rel="stylesheet" href="lib/maplibre-gl.css?v=2026.11.14-14">
+<link rel="stylesheet" href="lib/maplibre-gl.css?v=2026.11.14-15">
 <style>
 :root{--bg:#eef1f4;--panel:#fffffff2;--line:#d8dee6;--tx:#1f2933;--mut:#5f6b7a;--ok:#188038;--warn:#e37400;--bad:#d93025;--acc:#1a73e8;
-  --st:env(safe-area-inset-top);--sb:env(safe-area-inset-bottom)}
+  --st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);--sl:env(safe-area-inset-left,0px);--sr:env(safe-area-inset-right,0px)}
 *{box-sizing:border-box;margin:0}
 [hidden]{display:none!important}
-html,body{height:100%;overflow:hidden}
+html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+html{-webkit-text-size-adjust:100%}
+#viewport{position:fixed;top:0;left:0;width:100%;height:100%;height:100dvh;overflow:hidden}
+#viewport>div{position:absolute}
 body{background:var(--bg);color:var(--tx);font:16px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
 #map{position:fixed;inset:0;background:#eef1f4}
 button{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;cursor:pointer}
 button:active{transform:scale(.97)}
 /* горен банер */
-.top{position:fixed;left:10px;right:10px;max-width:520px;top:calc(var(--st) + 10px);z-index:3;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.top{position:fixed;left:calc(var(--sl) + 10px);right:calc(var(--sr) + 10px);max-width:520px;top:calc(var(--st) + 10px);z-index:3;display:flex;flex-direction:column;gap:8px;pointer-events:none}
 .top>*{pointer-events:auto}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 14px;box-shadow:0 2px 10px #0002;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 .card h2{font-size:12px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
@@ -42,7 +48,7 @@ button:active{transform:scale(.97)}
 .mut{color:var(--mut);font-size:14px}
 .result{border-left:4px solid var(--ok)}.result.over{border-left-color:var(--bad)}
 /* скорост като в навигация */
-.spdw{position:fixed;left:12px;bottom:calc(var(--sb) + 86px);z-index:3;display:flex;align-items:flex-end;gap:8px}
+.spdw{position:fixed;left:calc(var(--sl) + 12px);bottom:calc(var(--sb) + 86px);z-index:3;display:flex;align-items:flex-end;gap:8px}
 .spd{width:92px;height:92px;border-radius:50%;background:#fff;color:#111;display:flex;flex-direction:column;align-items:center;justify-content:center;
   box-shadow:0 3px 12px #0005;border:4px solid #fff;transition:background .3s,color .3s}
 .spd b{font-size:38px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
@@ -53,26 +59,26 @@ button:active{transform:scale(.97)}
 .rlim{width:54px;height:54px;font-size:21px;margin:0 0 4px}
 @keyframes glow{0%,100%{box-shadow:0 0 0 0 #d9302599,0 3px 12px #0005}50%{box-shadow:0 0 0 14px #d9302500,0 0 28px 8px #d93025cc}}
 /* дясна колона */
-.side{position:fixed;right:10px;bottom:calc(var(--sb) + 86px);z-index:3;display:flex;flex-direction:column;gap:8px}
+.side{position:fixed;right:calc(var(--sr) + 10px);bottom:calc(var(--sb) + 86px);z-index:3;display:flex;flex-direction:column;gap:8px}
 .side button{width:50px;height:50px;padding:0;border-radius:50%;font-size:20px;display:grid;place-items:center;background:var(--panel);box-shadow:0 2px 8px #0003}
 .side #shareBtn{position:absolute;right:58px;bottom:3px;width:44px;height:44px;border-radius:50%;color:var(--mut)}
 #center{position:relative;isolation:isolate}
 #center.off{color:var(--acc);border-color:var(--acc)}
 /* долна лента */
-.bottom{position:fixed;left:10px;right:10px;bottom:calc(var(--sb) + 10px);z-index:3;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.bottom{position:fixed;left:calc(var(--sl) + 10px);right:calc(var(--sr) + 10px);bottom:calc(var(--sb) + 10px);z-index:3;display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .bottom button{padding:15px;font-weight:600;font-size:16px}
 #go.on{background:#d93025;border-color:#d93025;color:#fff}
 #go:not(.on){background:#188038;border-color:#188038;color:#fff}
 .bottom button{box-shadow:0 2px 8px #0003}
-.chips{position:fixed;right:10px;bottom:calc(var(--sb) + 256px);z-index:3;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.chips{position:fixed;right:calc(var(--sr) + 10px);bottom:calc(var(--sb) + 256px);z-index:3;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
 .chip{font-size:11px;color:var(--mut);background:var(--panel);border:1px solid var(--line);border-radius:99px;padding:2px 8px;white-space:nowrap}
 .chip.ok{color:var(--ok);border-color:#9fd3ae}.chip.bad{color:var(--bad);border-color:#f0a8a2}
 /* MapLibre */
 .maplibregl-ctrl-group{background:var(--panel)!important;border:1px solid var(--line);border-radius:12px!important;box-shadow:0 2px 8px #0003!important}
 .maplibregl-ctrl-group button{width:40px;height:40px}
 .maplibregl-ctrl-group button+button{border-top:1px solid var(--line)!important}
-.maplibregl-ctrl-top-right{top:auto!important;bottom:calc(var(--sb) + 300px)}
-.maplibregl-ctrl-bottom-right{bottom:calc(var(--sb) + 68px)}
+.maplibregl-ctrl-top-right{right:var(--sr);top:auto!important;bottom:calc(var(--sb) + 300px)}
+.maplibregl-ctrl-bottom-right{right:var(--sr);bottom:calc(var(--sb) + 68px)}
 .maplibregl-ctrl-attrib{background:#fffc!important;color:#555;font-size:10px}
 .maplibregl-ctrl-attrib a{color:#333}
 .maplibregl-popup-content{background:#fff;color:var(--tx);border-radius:10px;font-size:13px;padding:10px 12px}
@@ -84,7 +90,7 @@ button:active{transform:scale(.97)}
 /* листове */
 .sheet{position:fixed;inset:0;background:#0006;display:none;align-items:flex-end;z-index:5}
 .sheet.show{display:flex}
-.sheet>div{background:#fff;width:100%;max-height:88vh;overflow:auto;border-radius:18px 18px 0 0;padding:18px 16px calc(18px + var(--sb))}
+.sheet>div{background:#fff;width:100%;max-height:calc(100% - var(--st) - 12px);overflow:auto;border-radius:18px 18px 0 0;padding:18px max(16px,var(--sr)) calc(18px + var(--sb)) max(16px,var(--sl));overscroll-behavior:contain}
 .sheet h3{font-size:18px;margin-bottom:12px}
 .row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--line)}
 .row select,.row input{font:inherit;background:#f1f4f8;color:var(--tx);border:1px solid var(--line);border-radius:8px;padding:6px}
@@ -107,7 +113,7 @@ body.navigating .searchBtn,body.navigating #idle{display:none}
 .ntx span{font-size:17px;line-height:1.25}
 .neta{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;padding-top:8px;border-top:1px solid #ffffff40;font-size:14px}
 .neta button{background:#ffffff26;border:0;color:#fff;padding:7px 14px;border-radius:10px;font-weight:600}
-.prev{position:fixed;left:10px;right:10px;bottom:calc(var(--sb) + 10px);z-index:4;max-width:520px;max-height:60vh;overflow:auto}
+.prev{position:fixed;left:calc(var(--sl) + 10px);right:calc(var(--sr) + 10px);bottom:calc(var(--sb) + 10px);z-index:4;max-width:520px;max-height:60%;overflow:auto}
 .prev b{font-size:17px}
 .prev .sum{margin:6px 0;font-size:15px}.prev .sum span{color:var(--ok);font-weight:700}
 .prev .secs{margin:6px 0;font-size:14px;color:var(--warn);font-weight:600}.prev .secs small{color:var(--mut);font-weight:400;font-size:12px}
@@ -115,17 +121,18 @@ body.navigating .searchBtn,body.navigating #idle{display:none}
 .pbtn.small button{padding:8px;font-size:13px;color:var(--mut)}
 button.primary{background:#1a73e8;border-color:#1a73e8;color:#fff;font-weight:600}
 button:disabled{opacity:.5}
-.srch{position:fixed;inset:0;background:#fff;z-index:6;display:none;flex-direction:column;padding-top:var(--st)}
+.srch{position:fixed;inset:0;background:#fff;z-index:6;display:none;flex-direction:column;padding:var(--st) var(--sr) var(--sb) var(--sl)}
 .srch.show{display:flex}
 .srow{display:flex;gap:8px;padding:10px;border-bottom:1px solid var(--line)}
 .srow button{border:0;background:none;font-size:22px;padding:6px 10px}
-.srow input{flex:1;font:inherit;font-size:17px;border:0;outline:0;background:#f1f4f8;border-radius:22px;padding:10px 16px}
-#sug{overflow:auto}
+.srow input{flex:1;min-width:0;font:inherit;font-size:17px;border:0;outline:0;background:#f1f4f8;border-radius:22px;padding:10px 16px}
+#sug{overflow:auto;min-height:0;overscroll-behavior:contain}
+.srow,.tabs{flex-shrink:0}
 .sg{display:flex;gap:12px;align-items:center;padding:12px 14px;border-bottom:1px solid #eef1f4;cursor:pointer}
 .sg .ico{width:32px;height:32px;border-radius:50%;background:#f1f4f8;display:grid;place-items:center;color:var(--mut);flex:none}
 .sg b{display:block;font-weight:600}.sg small{color:var(--mut)}
 .sg.none{cursor:default}
-.aform{flex:1;display:flex;flex-direction:column;gap:8px}
+.aform{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
 .aform input{font:inherit;font-size:16px;border:0;outline:0;background:#f1f4f8;border-radius:12px;padding:10px 14px;width:100%}
 .arow{display:flex;gap:8px}.arow input{flex:1;min-width:0}
 .srow .arow button{flex:none;padding:10px 16px;font-size:15px;border-radius:12px;background:#1a73e8;color:#fff;font-weight:600}
@@ -159,9 +166,27 @@ html.dark [class*=popup-anchor-bottom] .maplibregl-popup-tip{border-top-color:#2
 html.dark [class*=popup-anchor-top] .maplibregl-popup-tip{border-bottom-color:#26314f}
 html.dark .maplibregl-popup-anchor-left .maplibregl-popup-tip{border-right-color:#26314f}
 html.dark .maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color:#26314f}
+/* Keep controls usable on short landscape screens and inside iOS safe areas. */
+.top{max-height:calc(100% - var(--st) - var(--sb) - 200px);overflow:auto}
+@media(pointer:coarse){
+  .side #themeToggle{width:44px;height:44px;margin-right:3px}
+  .maplibregl-ctrl-group button{width:44px;height:44px}
+  .maplibregl-ctrl-top-right{bottom:calc(var(--sb) + 312px)}
+}
+@media(max-height:500px) and (orientation:landscape){
+  .top{right:auto;width:min(46%,520px);max-height:calc(100% - var(--st) - var(--sb) - 92px)}
+  .spdw{left:calc(var(--sl) + 50%);bottom:calc(var(--sb) + 80px)}
+  .spd{width:72px;height:72px}.spd b{font-size:30px}
+  .side{flex-direction:row;bottom:calc(var(--sb) + 80px)}
+  .side #shareBtn{position:static;align-self:center}
+  .side #themeToggle{margin:0;align-self:center}
+  .chips{bottom:calc(var(--sb) + 140px)}
+  .maplibregl-ctrl-top-right{bottom:auto;top:var(--st)!important}
+}
 </style>
 </head>
 <body>
+<div id="viewport">
 <div id="map"></div>
 
 <div class="top">
@@ -257,16 +282,18 @@ html.dark .maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color
 
 <div class="toast" id="toast"></div>
 
-<script src="lib/maplibre-gl.js?v=2026.11.14-14"></script>
-<script src="towns.js?v=2026.11.14-14"></script>
-<script src="data.js?v=2026.11.14-14"></script>
-<script src="roadlim.js?v=2026.11.14-14"></script>
-<script src="cameras.js?v=2026.11.14-14"></script>
-<script src="geometry.js?v=2026.11.14-14"></script>
-<script src="core.js?v=2026.11.14-14"></script>
-<script src="app.js?v=2026.11.14-14"></script>
-<script src="map.js?v=2026.11.14-14"></script>
-<script src="navcore.js?v=2026.11.14-14"></script>
-<script src="nav.js?v=2026.11.14-14"></script>
+</div>
+<script src="viewport.js?v=2026.11.14-15"></script>
+<script src="lib/maplibre-gl.js?v=2026.11.14-15"></script>
+<script src="towns.js?v=2026.11.14-15"></script>
+<script src="data.js?v=2026.11.14-15"></script>
+<script src="roadlim.js?v=2026.11.14-15"></script>
+<script src="cameras.js?v=2026.11.14-15"></script>
+<script src="geometry.js?v=2026.11.14-15"></script>
+<script src="core.js?v=2026.11.14-15"></script>
+<script src="app.js?v=2026.11.14-15"></script>
+<script src="map.js?v=2026.11.14-15"></script>
+<script src="navcore.js?v=2026.11.14-15"></script>
+<script src="nav.js?v=2026.11.14-15"></script>
 </body>
 </html>
