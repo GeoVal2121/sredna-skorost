@@ -41,15 +41,20 @@
     return { type: "FeatureCollection", features: f };
   }
   function sectionsGeo(activeId) {
-    var m = App.model(), seen = {}, f = [];
+    var m = App.model(), f = [];
     m.sections.forEach(function (s) {
-      var pair = [s.fromKey, s.toKey].sort().join("|"), act = s.id === activeId;
-      if (seen[pair] && !act) return; seen[pair] = 1;
-      var idx = parseInt(s.id, 10), enc = window.SS_GEO && SS_GEO[idx];
-      var coords = enc ? geoCache[idx] || (geoCache[idx] = SSCore.decodePolyline(enc).map(function (q) { return [q[1], q[0]]; }))
-        : [[m.points[s.fromKey].p[1], m.points[s.fromKey].p[0]], [m.points[s.toKey].p[1], m.points[s.toKey].p[0]]];
+      var act = s.id === activeId, idx = parseInt(s.id, 10);
+      var directional = window.SS_DIRECTION_GEO && SS_DIRECTION_GEO[s.id];
+      var enc = directional || (window.SS_GEO && SS_GEO[idx]);
+      var coords = geoCache[s.id];
+      if (!coords) {
+        coords = enc ? SSCore.decodePolyline(enc).map(function (q) { return [q[1], q[0]]; })
+          : [[m.points[s.fromKey].p[1], m.points[s.fromKey].p[0]], [m.points[s.toKey].p[1], m.points[s.toKey].p[0]]];
+        if (enc && !directional && s.id.endsWith("r")) coords.reverse();
+        geoCache[s.id] = coords;
+      }
       f.push({ type: "Feature", geometry: { type: "LineString", coordinates: coords },
-        properties: { act: act ? 1 : 0, name: s.roadName + ": " + s.from + " – " + s.to, L: s.L, limit: s.limit, up: s.upcoming ? 1 : 0 } });
+        properties: { id: s.id, shared: directional ? 0 : 1, act: act ? 1 : 0, name: s.roadName + ": " + s.from + " → " + s.to, L: s.L, limit: s.limit, up: s.upcoming ? 1 : 0 } });
     });
     return { type: "FeatureCollection", features: f };
   }
@@ -119,12 +124,14 @@
       // предстоящите (още непуснати) отсечки: сива прекъсната линия; работещите – ярко оранжеви
       addBelow({ id: "secs-up", type: "line", source: "secs", filter: ["all", ["==", ["get", "up"], 1], ["!=", ["get", "act"], 1]],
         paint: { "line-color": isDark ? "#a3abbd" : "#8a9099", "line-dasharray": [2, 1], "line-opacity": 1,
-          "line-width": ["interpolate", ["linear"], ["zoom"], 10, 6, 14, 10, 17, 22] } });
+          "line-offset": ["interpolate", ["linear"], ["zoom"], 12, 0, 16, ["*", ["get", "shared"], 3]],
+          "line-width": ["interpolate", ["linear"], ["zoom"], 10, 4, 14, 4, 17, 5] } });
       addBelow({ id: "secs", type: "line", source: "secs", layout: { "line-cap": "round" }, filter: ["any", ["!=", ["get", "up"], 1], ["==", ["get", "act"], 1]],
         // на тъмен фон – по-ярки и непрозрачни, иначе оранжевото изглежда кафяво
         paint: { "line-color": ["case", ["==", ["get", "act"], 1], isDark ? "#ff5a4f" : "#d93025", isDark ? "#ffa726" : "#ff6d00"],
-          "line-width": ["interpolate", ["linear"], ["zoom"], 10, ["case", ["==", ["get", "act"], 1], 8, 6],
-            14, ["case", ["==", ["get", "act"], 1], 12, 10], 17, ["case", ["==", ["get", "act"], 1], 26, 22]], "line-opacity": isDark ? 0.95 : 0.9 } });
+          "line-offset": ["interpolate", ["linear"], ["zoom"], 12, 0, 16, ["*", ["get", "shared"], 3]],
+          "line-width": ["interpolate", ["linear"], ["zoom"], 10, ["case", ["==", ["get", "act"], 1], 6, 4],
+            17, ["case", ["==", ["get", "act"], 1], 6, 5]], "line-opacity": isDark ? 0.95 : 0.9 } });
       addBelow({ id: "trk", type: "line", source: "trk", layout: { "line-cap": "round", "line-join": "round" },
         paint: { "line-color": isDark ? "#8c95ab" : "#9aa0a6", "line-width": 5, "line-opacity": 0.8 } });
       // стационарни камери: икона + ограничение
@@ -150,7 +157,7 @@
       map.on("click", ["secs", "secs-up"], function (e) {
         var p = e.features[0].properties;
         new maplibregl.Popup({ offset: 6 }).setLngLat(e.lngLat)
-          .setHTML("<b>" + p.name + "</b><br>" + String((+p.L).toFixed(1)).replace(".", ",") + " км · ограничение " + p.limit + (p.up == 1 ? "<br>предстояща" : "")).addTo(map);
+          .setHTML("<b>" + p.name + "</b><br>" + String((+p.L).toFixed(1)).replace(".", ",") + " км · ограничение " + p.limit + (p.up == 1 ? "<br>предстояща" : "<br>сертифицирана")).addTo(map);
       });
       map.on("click", "cams", function (e) {
         var p = e.features[0].properties;
