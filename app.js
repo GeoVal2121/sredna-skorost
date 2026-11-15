@@ -2,7 +2,7 @@
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
   // ---------- нова версия: ако телефонът е запазил стара, презарежда се автоматично ----------
-  var APP_VERSION = "2026.11.15-12";
+  var APP_VERSION = "2026.11.15-13";
   try {
     fetch("version.json?t=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
       if (j && j.v && j.v !== APP_VERSION && sessionStorage.getItem("ss_reload") !== j.v) {
@@ -312,7 +312,7 @@
     }).join("");
   }
   var tt;
-  function toast(m) { var t = $("toast"); t.textContent = m; t.style.display = "block"; clearTimeout(tt); tt = setTimeout(function () { t.style.display = "none"; }, 3500); }
+  function toast(m) { var t = $("toast"); t.textContent = m; t.style.display = m ? "block" : "none"; clearTimeout(tt); if (!m) return; tt = setTimeout(function () { t.style.display = "none"; }, 3500); }
   function dialog(title, body, yes) {
     $("dlgT").textContent = title; $("dlgB").textContent = body; $("dlg").classList.add("show");
     $("dlgYes").onclick = function () { $("dlg").classList.remove("show"); yes(); };

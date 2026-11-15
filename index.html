@@ -214,7 +214,6 @@ body.navigating #installEntry,body:has(#go.on) #installEntry{display:none}
 body.measuring #idle,body.measuring #installEntry{display:none}
 .measure-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}.measure-head strong{font-size:22px;font-variant-numeric:tabular-nums}
 #measurePath{font-size:14px;margin:8px 0;max-height:90px;overflow:auto;line-height:1.5}#measureHint{font-size:12px}
-#measureError{font-size:13px;line-height:1.5;margin-top:8px;color:var(--tx)}
 .measure-actions{display:flex;gap:8px;margin-top:8px}.measure-actions button{min-height:44px;padding:8px 14px;font-size:13px}
 #measureUndo{color:#185abc;border-color:#a8c7fa;background:#f5f9ff}
 #measureClear{color:#b3261e;border-color:#efb4b0;background:#fff8f7}
@@ -238,7 +237,6 @@ html.dark .road-badge{background:#223e64;color:#d6e7ff;border-color:#5578a6}
   <div class="card" id="measurement" hidden aria-label="Измерване на отсечки">
     <div class="measure-head"><span class="road-badge" id="measureRoad"></span><strong id="measureTotal" aria-live="polite"></strong></div>
     <div id="measurePath"></div><div class="mut" id="measureHint"></div>
-    <div id="measureError" role="status" aria-live="polite" hidden></div>
     <div class="measure-actions"><button id="measureUndo" type="button">Отмени последната точка</button><button id="measureClear" type="button">Изчисти</button></div>
   </div>
   <div class="card" id="idle"><div id="nearest" class="mut">Натисни „Старт“, за да започне следенето.</div></div>
@@ -348,19 +346,19 @@ html.dark .road-badge{background:#223e64;color:#d6e7ff;border-color:#5578a6}
 <div class="toast" id="toast"></div>
 
 </div>
-<script defer src="install.js?v=2026.11.15-12"></script>
-<script defer src="viewport.js?v=2026.11.15-12"></script>
-<script defer src="towns.js?v=2026.11.15-12"></script>
-<script defer src="data.js?v=2026.11.15-12"></script>
-<script defer src="roadlim.js?v=2026.11.15-12"></script>
-<script defer src="cameras.js?v=2026.11.15-12"></script>
-<script defer src="geometry.js?v=2026.11.15-12"></script>
-<script defer src="direction-geometry.js?v=2026.11.15-12"></script>
-<script defer src="core.js?v=2026.11.15-12"></script>
-<script defer src="app.js?v=2026.11.15-12"></script>
+<script defer src="install.js?v=2026.11.15-13"></script>
+<script defer src="viewport.js?v=2026.11.15-13"></script>
+<script defer src="towns.js?v=2026.11.15-13"></script>
+<script defer src="data.js?v=2026.11.15-13"></script>
+<script defer src="roadlim.js?v=2026.11.15-13"></script>
+<script defer src="cameras.js?v=2026.11.15-13"></script>
+<script defer src="geometry.js?v=2026.11.15-13"></script>
+<script defer src="direction-geometry.js?v=2026.11.15-13"></script>
+<script defer src="core.js?v=2026.11.15-13"></script>
+<script defer src="app.js?v=2026.11.15-13"></script>
 <script defer src="lib/maplibre-gl.js?v=45a9b07a9189"></script>
-<script defer src="map.js?v=2026.11.15-12"></script>
-<script defer src="navcore.js?v=2026.11.15-12"></script>
-<script defer src="nav.js?v=2026.11.15-12"></script>
+<script defer src="map.js?v=2026.11.15-13"></script>
+<script defer src="navcore.js?v=2026.11.15-13"></script>
+<script defer src="nav.js?v=2026.11.15-13"></script>
 </body>
 </html>

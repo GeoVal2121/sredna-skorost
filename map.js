@@ -58,14 +58,15 @@
     });
     return { type: "FeatureCollection", features: f };
   }
-  var measureKeys = [], infoPopup = null;
+  var measureKeys = [], infoPopup = null, measureMessage = null;
   function kmLabel(n) { return Number(n).toFixed(3).replace(".", ","); }
   function pointLabel(key) {
     var p = App.model().points[key], road = key.split(":")[0];
     return key.slice(key.indexOf(":") + 1) + " · " + SS_DATA.roads[road] + " · км " + kmLabel(p.km);
   }
   function updateMeasurement() {
-    $("measureError").hidden = true; $("measureError").textContent = "";
+    if (measureMessage && $("toast").textContent === measureMessage) App.toast("");
+    measureMessage = null;
     var result = SSCore.measureSections(App.model(), measureKeys);
     $("measurement").hidden = !measureKeys.length;
     document.body.classList.toggle("measuring", !!measureKeys.length);
@@ -88,9 +89,8 @@
     if (measureKeys[measureKeys.length - 1] === key) { updateMeasurement(); return; }
     var next = measureKeys.concat(key), result = SSCore.measureSections(App.model(), next);
     if (result.error) {
-      $("measureHint").hidden = true;
-      $("measureError").textContent = result.error;
-      $("measureError").hidden = false;
+      measureMessage = result.error;
+      App.toast(measureMessage);
       return;
     }
     measureKeys = next; updateMeasurement();
