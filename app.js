@@ -2,7 +2,7 @@
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
   // ---------- нова версия: ако телефонът е запазил стара, презарежда се автоматично ----------
-  var APP_VERSION = "2026.11.15-2";
+  var APP_VERSION = "2026.11.15-3";
   try {
     fetch("version.json?t=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
       if (j && j.v && j.v !== APP_VERSION && sessionStorage.getItem("ss_reload") !== j.v) {
@@ -189,8 +189,13 @@
     g.textContent = "GPS ±" + r0(fix.acc || 0) + " м";
     g.className = "chip " + ((fix.acc || 0) <= 30 ? "ok" : (fix.acc || 0) > 100 ? "bad" : "");
   }
+  function followTravel() {
+    cfg.headUp = true; $("headUp").checked = true; store.set("cfg", cfg);
+    if (window.SSMap) SSMap.follow();
+  }
   function start() {
     unlockAudio();
+    followTravel();
     if (!("geolocation" in navigator)) { toast("Устройството няма GPS достъп."); return; }
     if (!window.isSecureContext) toast("GPS изисква HTTPS адрес.");
     watchId = navigator.geolocation.watchPosition(function (pos) {
@@ -331,6 +336,7 @@
     stop(); unlockAudio(); keepAwake();
     tracker.reset();
     if (window.SSMap) SSMap.resetTrack();
+    followTravel();
     var P = model.points, A = P["T:Трилистник"].p, B = P["T:Опълченец"].p, Cc = P["T:Чирпан"].p;
     var pre = [A[0] + (A[0] - B[0]) * 0.25, A[1] + (A[1] - B[1]) * 0.25], post = [Cc[0] + (Cc[0] - B[0]) * 0.25, Cc[1] + (Cc[1] - B[1]) * 0.25];
     // междинна точка встрани, така че дължината на пътя = официалната дължина на отсечката

@@ -178,7 +178,10 @@
       if (!pressXY || !e.touches[0]) return; var t = e.touches[0], rc = cv.getBoundingClientRect();
       if (Math.abs(t.clientX - rc.left - pressXY[0]) + Math.abs(t.clientY - rc.top - pressXY[1]) > 12) clearTimeout(pressT);
     }, { passive: true });
-    cv.addEventListener("touchend", function () { touching = false; clearTimeout(pressT); }, { passive: true });
+    function endTouch(e) { touching = !!(e.touches && e.touches.length); clearTimeout(pressT); }
+    cv.addEventListener("touchend", endTouch, { passive: true });
+    cv.addEventListener("touchcancel", endTouch, { passive: true });
+    window.addEventListener("blur", endTouch);
     cv.addEventListener("mousedown", function () { touching = true; });
     window.addEventListener("mouseup", function () { touching = false; });
     map.on("contextmenu", function (e) { longPress([e.point.x, e.point.y]); });
@@ -189,7 +192,7 @@
   }
 
   function setFollow(on) {
-    follow = on; $("center").classList.toggle("off", !on); clearTimeout(refollowT);
+    follow = on; if (on) touching = false; $("center").classList.toggle("off", !on); clearTimeout(refollowT);
     if (!on) refollowT = setTimeout(function () { if (window.SSNav && SSNav.hasRoute() && !SSNav.active()) return; if (!touching) { setFollow(true); recenter(); } else setFollow(false); }, 8000);
   }
   function longPress(xy) {
@@ -245,7 +248,7 @@
 
   // ---------- плавно движение: стрелката и камерата се интерполират между GPS точките ----------
   // без закъснение: стрелката се плъзга ~0,35 с към новата точка и продължава напред със скоростта и посоката (до 1,2 с без нов сигнал)
-  var anim = { from: null, to: null, h0: 0, h1: 0, t0: 0, dur: 350, lastFix: 0, v: 0, vh: 0, age: 0, path: null, dr: false }, raf = null, camBearing = null, easing = false;
+  var anim = { from: null, to: null, h0: 0, h1: 0, t0: 0, dur: 350, lastFix: 0, v: 0, vh: 0, age: 0, path: null, dr: false }, raf = null, camBearing = null;
   function ahead(p, h, d) {
     var r = h * Math.PI / 180;
     return [p[0] + d * Math.cos(r) / 111320, p[1] + d * Math.sin(r) / (111320 * Math.cos(p[0] * Math.PI / 180))];
@@ -277,10 +280,10 @@
     var now = performance.now(), c = animPos(now);
     car.setLngLat([c.p[1], c.p[0]]).setRotation(c.h);
     carEl.style.opacity = anim.dr || anim.uncertain || !hasHeading ? "0.55" : "";
-    if (follow && !touching && !easing) {
-      var up = App.cfg.headUp, moving = App.tracker().speed > 8;
-      if (camBearing == null) camBearing = map.getBearing();
-      camBearing = up ? (moving ? lerpAngle(camBearing, c.h, 0.12) : camBearing) : lerpAngle(camBearing, 0, 0.12);
+    if (follow && !touching) {
+      var up = App.cfg.headUp;
+      // The marker heading is already interpolated; use the same angle for the camera.
+      camBearing = up ? (hasHeading ? c.h : map.getBearing()) : 0;
       var opt = { center: [c.p[1], c.p[0]], bearing: camBearing, pitch: map.getPitch() + (targetPitch() - map.getPitch()) * 0.1, padding: pad() };
       var z = map.getZoom();
       if (z < 12) opt.zoom = 15;
@@ -385,9 +388,10 @@
   function recenter() {
     if (!map || !anim.to) return;
     var c = animPos(performance.now()), up = App.cfg.headUp;
-    camBearing = up ? c.h : 0; easing = true;
-    map.easeTo({ center: [c.p[1], c.p[0]], bearing: camBearing, pitch: targetPitch(), zoom: Math.max(map.getZoom(), 15), padding: pad(), duration: 600 });
-    map.once("moveend", function () { easing = false; if (!raf) raf = requestAnimationFrame(frame); });
+    camBearing = up ? (hasHeading ? c.h : map.getBearing()) : 0;
+    map.stop();
+    map.jumpTo({ center: [c.p[1], c.p[0]], bearing: camBearing, pitch: targetPitch(), zoom: Math.max(map.getZoom(), 15), padding: pad() });
+    if (!raf) raf = requestAnimationFrame(frame);
   }
 
   function refresh() {
