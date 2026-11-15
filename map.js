@@ -9,6 +9,17 @@
   function targetPitch() { return selectedPitch == null ? (App.cfg.headUp ? 50 : 0) : selectedPitch; }
   var geoCache = {}, isDark = !!App.isDark(), fallback = null;
   function styleUrl(d) { return "https://tiles.openfreemap.org/styles/" + (d ? "fiord" : "liberty"); }
+  function addDarkBuildings() {
+    if (!isDark || map.getLayer("building-3d")) return;
+    var layers = map.getStyle().layers || [], i = layers.findIndex(function (l) { return l.id === "building"; });
+    if (i < 0) return; // The offline fallback has no building data.
+    var building = layers[i];
+    map.addLayer({ id: "building-3d", type: "fill-extrusion", source: building.source,
+      "source-layer": building["source-layer"], minzoom: 14, filter: ["!", ["has", "hide_3d"]],
+      paint: { "fill-extrusion-base": ["get", "render_min_height"],
+        "fill-extrusion-height": ["get", "render_height"], "fill-extrusion-color": "#657596", "fill-extrusion-opacity": 0.9 }
+    }, layers[i + 1] && layers[i + 1].id);
+  }
   // смяна светло/тъмно: новият стил минава пак през style.load и слоевете ни се добавят наново
   function setTheme(d) {
     if (d === isDark) return;
@@ -89,6 +100,7 @@
     var fbTimer = setTimeout(function () { if (!ready) { offline = true; map.setStyle(fallback()); } }, 15000);
     map.on("error", function (e) { if (!ready && !offline && /styles\/(liberty|fiord)/.test(String(e && e.error && e.error.message))) { clearTimeout(fbTimer); offline = true; map.setStyle(fallback()); } });
     map.on("style.load", function () {
+      addDarkBuildings();
       if (map.getSource("secs")) return;
       map.addSource("secs", { type: "geojson", data: sectionsGeo(null) });
       map.addSource("pts", { type: "geojson", data: pointsGeo() });
