@@ -2,7 +2,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('nod
 const C=require('../core.js'),D=require('../data.js'),G=require('../geometry.js'),DG=require('../direction-geometry.js');
 const source=fs.readFileSync('map.js','utf8'),model=C.buildModel(D,{});
 const ctx={App:{model:()=>model},SSCore:C,SS_GEO:G,SS_DIRECTION_GEO:DG,geoCache:{}};ctx.window=ctx;vm.createContext(ctx);
-vm.runInContext(source.slice(source.indexOf('  function sectionsGeo'),source.indexOf('  function camsGeo')),ctx);
+vm.runInContext(source.slice(source.indexOf('  function sectionsGeo'),source.indexOf('  var measureKeys')),ctx);
 const features=ctx.sectionsGeo('24r').features;
 assert.equal(features.length,model.sections.length);assert.equal(features.length,86);
 assert.equal(features.filter(f=>f.properties.act).length,1);

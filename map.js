@@ -58,6 +58,54 @@
     });
     return { type: "FeatureCollection", features: f };
   }
+  var measureKeys = [], infoPopup = null;
+  function kmLabel(n) { return Number(n).toFixed(3).replace(".", ","); }
+  function pointLabel(key) {
+    var p = App.model().points[key], road = key.split(":")[0];
+    return key.slice(key.indexOf(":") + 1) + " · " + SS_DATA.roads[road] + " · км " + kmLabel(p.km);
+  }
+  function updateMeasurement() {
+    var result = SSCore.measureSections(App.model(), measureKeys);
+    $("measurement").hidden = !measureKeys.length;
+    document.body.classList.toggle("measuring", !!measureKeys.length);
+    if (measureKeys.length) {
+      $("measureRoad").textContent = SS_DATA.roads[measureKeys[0].split(":")[0]];
+      $("measureTotal").textContent = result.sections.length ? kmLabel(result.total) + " км" : "Начална точка";
+      $("measurePath").textContent = measureKeys.map(pointLabel).join(" → ") + (result.sections.length ? " · общо със средна скорост за " + result.sections.length + (result.sections.length === 1 ? " отсечка" : " отсечки") : "");
+      $("measureHint").textContent = result.sections.length ? (result.gaps ? "Прекъсванията не са включени." : "") : "Избери крайна синя точка на същия път. Междинните отсечки се сумират автоматично.";
+      $("measureHint").hidden = !$("measureHint").textContent;
+      $("measureUndo").disabled = measureKeys.length < 2;
+    }
+    if (!map || !map.getSource("measure")) return;
+    var ids = result.sections.map(function (s) { return s.id; });
+    map.getSource("measure").setData({ type: "FeatureCollection", features: sectionsGeo(null).features.filter(function (f) { return ids.indexOf(f.properties.id) >= 0; }) });
+    map.setPaintProperty("pts", "circle-stroke-color", ["case", ["in", ["get", "key"], ["literal", result.points]], "#7c3aed", "#fff"]);
+    map.setPaintProperty("pts", "circle-stroke-width", ["case", ["in", ["get", "key"], ["literal", result.points]], 4, 2.5]);
+  }
+  function selectMeasurePoint(key) {
+    if (infoPopup) infoPopup.remove();
+    if (measureKeys[measureKeys.length - 1] === key) return;
+    var next = measureKeys.concat(key), result = SSCore.measureSections(App.model(), next);
+    if (result.error) { App.toast(result.error); return; }
+    measureKeys = next; updateMeasurement();
+  }
+  $("measureUndo").onclick = function () { measureKeys.pop(); updateMeasurement(); };
+  $("measureClear").onclick = function () { measureKeys = []; updateMeasurement(); if (infoPopup) infoPopup.remove(); };
+  function showInfo(e, title, road, detail) {
+    if (infoPopup) infoPopup.remove();
+    var box = document.createElement("div"), name = document.createElement("b"), badge = document.createElement("div"), text = document.createElement("div");
+    name.textContent = title; badge.className = "road-badge"; badge.textContent = road; text.textContent = detail;
+    box.append(name, document.createElement("br"), badge, text);
+    infoPopup = new maplibregl.Popup({ offset: 14, maxWidth: "300px" }).setLngLat(e.lngLat).setDOMContent(box).addTo(map);
+  }
+  function clickedPoint(e) {
+    var hits = map.queryRenderedFeatures(e.point, { layers: ["pts-hit"] });
+    hits.sort(function (a, b) {
+      var x = map.project(a.geometry.coordinates), y = map.project(b.geometry.coordinates);
+      return Math.hypot(x.x - e.point.x, x.y - e.point.y) - Math.hypot(y.x - e.point.x, y.y - e.point.y);
+    });
+    return hits[0];
+  }
   function camsGeo() {
     var on = App.cfg.cams !== false;
     return { type: "FeatureCollection", features: on ? (window.SS_CAMS || []).map(function (c) {
@@ -141,30 +189,33 @@
         layout: { "icon-image": "cam", "icon-size": ["interpolate", ["linear"], ["zoom"], 8, 0.6, 14, 1], "icon-allow-overlap": true,
           "text-field": offline ? "" : ["get", "lim"], "text-font": ["Noto Sans Bold"], "text-size": 11, "text-offset": [0, 1.5], "text-anchor": "top", "text-allow-overlap": true },
         paint: { "text-color": isDark ? "#ff8a80" : "#d93025", "text-halo-color": isDark ? "#26314f" : "#fff", "text-halo-width": 1.8 } });
+      map.addSource("measure", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+      map.addLayer({ id: "measure", type: "line", source: "measure", paint: { "line-color": "#7c3aed", "line-width": 6, "line-opacity": 0.85, "line-offset": ["interpolate", ["linear"], ["zoom"], 12, 0, 16, ["*", ["get", "shared"], 3]] } });
+      map.addLayer({ id: "pts-hit", type: "circle", source: "pts", paint: { "circle-radius": 22, "circle-opacity": 0 } });
       map.addLayer({ id: "pts", type: "circle", source: "pts",
         paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 4, 12, 8, 16, 11], "circle-color": ["get", "col"],
           "circle-stroke-color": "#fff", "circle-stroke-width": 2.5 } });
       if (!offline) map.addLayer({ id: "pts-lbl", type: "symbol", source: "pts", minzoom: 9,
         layout: { "text-field": ["get", "name"], "text-size": 12, "text-offset": [0, 1.3], "text-anchor": "top", "text-font": ["Noto Sans Regular"] },
         paint: { "text-color": isDark ? "#e8eaed" : "#1f2933", "text-halo-color": isDark ? "#26314f" : "#fff", "text-halo-width": 1.8 } });
+      updateMeasurement();
       if (handlers) { ready = true; refresh(); return; }
       handlers = true;
-      map.on("click", "pts", function (e) {
-        var p = e.features[0].properties, srcT = p.src === "approx" ? "приблизителна (по населеното място)" : p.src === "osm" ? "от OpenStreetMap" : p.src === "bgtoll" ? "от официалната карта на BG TOLL" : "калибрирана от теб";
-        new maplibregl.Popup({ offset: 10 }).setLngLat(e.lngLat)
-          .setHTML("<b>" + p.name + "</b><br>" + p.road + (p.km != null ? ", км " + String(p.km).replace(".", ",") : "") + "<br><span style='color:#5f6b7a'>Позиция: " + srcT + "</span>").addTo(map);
+      map.on("click", "pts-hit", function (e) {
+        var hit = clickedPoint(e); if (hit) selectMeasurePoint(hit.properties.key);
       });
       map.on("click", ["secs", "secs-up"], function (e) {
-        var p = e.features[0].properties;
-        new maplibregl.Popup({ offset: 6 }).setLngLat(e.lngLat)
-          .setHTML("<b>" + p.name + "</b><br>" + String((+p.L).toFixed(1)).replace(".", ",") + " км · ограничение " + p.limit + (p.up == 1 ? "<br>предстояща" : "<br>сертифицирана")).addTo(map);
+        if (clickedPoint(e)) return;
+        var p = e.features[0].properties, section = App.model().sections.find(function (s) { return s.id === p.id; });
+        showInfo(e, section.from + " → " + section.to, section.roadName,
+          kmLabel(p.L) + " км · ограничение " + p.limit + " км/ч · " + (p.up == 1 ? "предстояща" : "сертифицирана"));
       });
       map.on("click", "cams", function (e) {
+        if (clickedPoint(e)) return;
         var p = e.features[0].properties;
-        new maplibregl.Popup({ offset: 14 }).setLngLat(e.lngLat)
-          .setHTML("<b>Стационарна камера</b><br>" + p.town + ", " + p.loc + (p.lim ? "<br>Ограничение <b>" + p.lim + " км/ч</b>" : "") + "<br><span style='color:#5f6b7a'>Източник: OpenStreetMap</span>").addTo(map);
+        showInfo(e, "Стационарна камера", p.town, p.loc + (p.lim ? " · " + p.lim + " км/ч" : ""));
       });
-      ["pts", "secs", "secs-up", "cams"].forEach(function (l) {
+      ["pts-hit", "secs", "secs-up", "cams"].forEach(function (l) {
         map.on("mouseenter", l, function () { map.getCanvas().style.cursor = "pointer"; });
         map.on("mouseleave", l, function () { map.getCanvas().style.cursor = ""; });
       });
@@ -406,6 +457,7 @@
     map.getSource("pts").setData(pointsGeo());
     if (map.getSource("cams")) map.getSource("cams").setData(camsGeo());
     map.getSource("secs").setData(sectionsGeo(lastActiveId));
+    updateMeasurement();
   }
   function resetTrack() { track = []; prevSnap = null; lastP = null; headingAnchor = null; hasHeading = false; heading = 0; anim.to = null; anim.lastFix = 0; if (ready) map.getSource("trk").setData(trackGeo()); setFollow(true); }
 

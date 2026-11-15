@@ -209,6 +209,19 @@ body.navigating #installEntry,body:has(#go.on) #installEntry{display:none}
 #reportClose{display:block;margin:12px auto 0;min-height:44px;border:0;background:transparent;color:var(--mut)}
 #reportNotice{position:fixed;left:12px;right:12px;bottom:calc(var(--sb) + 82px);z-index:8;max-width:460px;margin:auto;padding:12px 14px;border-radius:14px;background:#17233b;color:#fff;box-shadow:0 3px 12px #0003;display:flex;gap:10px;align-items:center;justify-content:space-between;font-size:14px}
 #reportNotice[hidden]{display:none}#reportUndo{min-height:44px;border:0;background:transparent;color:#b9d6ff;font-weight:600;padding:8px}
+
+.road-badge{display:inline-block;background:#e8f0fe;color:#174ea6;border:1px solid #b8cff2;border-radius:7px;padding:3px 8px;font-size:13px;font-weight:700}
+body.measuring #idle,body.measuring #installEntry{display:none}
+.measure-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}.measure-head strong{font-size:22px;font-variant-numeric:tabular-nums}
+#measurePath{font-size:14px;margin:8px 0;max-height:90px;overflow:auto;line-height:1.5}#measureHint{font-size:12px}
+.measure-actions{display:flex;gap:8px;margin-top:8px}.measure-actions button{min-height:44px;padding:8px 14px;font-size:13px}
+#measureUndo{color:#185abc;border-color:#a8c7fa;background:#f5f9ff}
+#measureClear{color:#b3261e;border-color:#efb4b0;background:#fff8f7}
+#measureUndo:disabled{opacity:.45;cursor:default}
+html.dark #measureUndo{color:#aecbfa;border-color:#5578a6;background:#223650}
+html.dark #measureClear{color:#ffb4ab;border-color:#995f61;background:#432e3b}
+html.dark .road-badge{background:#223e64;color:#d6e7ff;border-color:#5578a6}
+.maplibregl-popup-content{max-width:min(300px,calc(100vw - 40px));padding-right:30px;line-height:1.5}.maplibregl-popup-close-button{min-width:30px;min-height:30px}
 </style>
 </head>
 <body>
@@ -221,6 +234,11 @@ body.navigating #installEntry,body:has(#go.on) #installEntry{display:none}
     <div class="neta"><span><b class="nleft" id="navLeft"></b><span id="navEta"></span></span><button id="endNav">Край</button></div>
   </div>
   <button class="searchBtn" id="searchBtn"><svg viewBox="0 0 24 24" width="20" height="20"><circle cx="10" cy="10" r="6.5" fill="none" stroke="#5f6b7a" stroke-width="2.2"/><path d="M15 15 L21 21" stroke="#5f6b7a" stroke-width="2.4" stroke-linecap="round"/></svg>Накъде?</button>
+  <div class="card" id="measurement" hidden aria-label="Измерване на отсечки">
+    <div class="measure-head"><span class="road-badge" id="measureRoad"></span><strong id="measureTotal" aria-live="polite"></strong></div>
+    <div id="measurePath"></div><div class="mut" id="measureHint"></div>
+    <div class="measure-actions"><button id="measureUndo" type="button">Отмени последната точка</button><button id="measureClear" type="button">Изчисти</button></div>
+  </div>
   <div class="card" id="idle"><div id="nearest" class="mut">Натисни „Старт“, за да започне следенето.</div></div>
   <button id="installEntry" type="button" data-install hidden>↓ Инсталирай приложението</button>
   <div class="card" id="act" hidden>
@@ -328,19 +346,19 @@ body.navigating #installEntry,body:has(#go.on) #installEntry{display:none}
 <div class="toast" id="toast"></div>
 
 </div>
-<script defer src="install.js?v=2026.11.15-9"></script>
-<script defer src="viewport.js?v=2026.11.15-9"></script>
-<script defer src="towns.js?v=2026.11.15-9"></script>
-<script defer src="data.js?v=2026.11.15-9"></script>
-<script defer src="roadlim.js?v=2026.11.15-9"></script>
-<script defer src="cameras.js?v=2026.11.15-9"></script>
-<script defer src="geometry.js?v=2026.11.15-9"></script>
-<script defer src="direction-geometry.js?v=2026.11.15-9"></script>
-<script defer src="core.js?v=2026.11.15-9"></script>
-<script defer src="app.js?v=2026.11.15-9"></script>
+<script defer src="install.js?v=2026.11.15-10"></script>
+<script defer src="viewport.js?v=2026.11.15-10"></script>
+<script defer src="towns.js?v=2026.11.15-10"></script>
+<script defer src="data.js?v=2026.11.15-10"></script>
+<script defer src="roadlim.js?v=2026.11.15-10"></script>
+<script defer src="cameras.js?v=2026.11.15-10"></script>
+<script defer src="geometry.js?v=2026.11.15-10"></script>
+<script defer src="direction-geometry.js?v=2026.11.15-10"></script>
+<script defer src="core.js?v=2026.11.15-10"></script>
+<script defer src="app.js?v=2026.11.15-10"></script>
 <script defer src="lib/maplibre-gl.js?v=45a9b07a9189"></script>
-<script defer src="map.js?v=2026.11.15-9"></script>
-<script defer src="navcore.js?v=2026.11.15-9"></script>
-<script defer src="nav.js?v=2026.11.15-9"></script>
+<script defer src="map.js?v=2026.11.15-10"></script>
+<script defer src="navcore.js?v=2026.11.15-10"></script>
+<script defer src="nav.js?v=2026.11.15-10"></script>
 </body>
 </html>
