@@ -38,7 +38,7 @@
     var result = { sections: [], points: keys.length ? [keys[0]] : [], total: 0, gaps: 0, error: null };
     for (var i = 1; i < keys.length; i++) {
       var start = model.points[keys[i - 1]], end = model.points[keys[i]], road = keys[i - 1].split(":")[0];
-      if (!start || !end || keys[i].split(":")[0] !== road || start.km === end.km) { result.error = "Избери друга точка на същия път."; return result; }
+      if (!start || !end || keys[i].split(":")[0] !== road || start.km === end.km) { result.error = "В момента измервате друго разстояние. Натиснете „Изчисти“ и изберете две сини точки в участъка, който искате да измерите."; return result; }
       var sign = end.km > start.km ? 1 : -1;
       var legs = model.sections.filter(function (s) {
         var a = model.points[s.fromKey].km, b = model.points[s.toKey].km;
@@ -48,7 +48,7 @@
       var cursor = keys[i - 1];
       for (var j = 0; j < legs.length; j++) {
         var leg = legs[j];
-        if (result.sections.some(function (s) { return parseInt(s.id, 10) === parseInt(leg.id, 10); })) { result.error = "Тази отсечка вече е включена. Използвай „Отмени последната точка“ или „Изчисти“."; return result; }
+        if (result.sections.some(function (s) { return parseInt(s.id, 10) === parseInt(leg.id, 10); })) { result.error = "В момента измервате друго разстояние. Натиснете „Изчисти“ и изберете две сини точки в участъка, който искате да измерите."; return result; }
         if (cursor !== leg.fromKey) { result.gaps++; result.points.push(leg.fromKey); }
         result.sections.push(leg); result.points.push(leg.toKey); result.total += leg.L; cursor = leg.toKey;
       }
