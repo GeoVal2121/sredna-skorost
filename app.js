@@ -2,7 +2,7 @@
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
   // ---------- нова версия: ако телефонът е запазил стара, презарежда се автоматично ----------
-  var APP_VERSION = "2026.11.15-6";
+  var APP_VERSION = "2026.11.15-8";
   try {
     fetch("version.json?t=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
       if (j && j.v && j.v !== APP_VERSION && sessionStorage.getItem("ss_reload") !== j.v) {
@@ -271,18 +271,6 @@
     c.className = "chip" + (n === total ? " ok" : "");
   }
 
-  // ---------- калибрация ----------
-  function calibrate() {
-    var p = tracker.last && tracker.last.p;
-    if (!p) { toast("Няма GPS позиция. Натисни „Старт“."); return; }
-    var best = null, bd = Infinity;
-    for (var k in model.points) { var d = SSCore.dist(model.points[k].p, p); if (d < bd) { bd = d; best = k; } }
-    if (!best || bd > 5000) { toast("Няма рамка на отсечка в радиус 5 км."); return; }
-    var name = best.split(":"), road = SS_DATA.roads[name[0]];
-    dialog("Рамка „" + name.slice(1).join(":") + "“", road + ". Записвам текущото ти място като позиция на рамката (досегашната точка е на " + kmText(bd) + ").",
-      function () { manual[best] = p; store.set("manual", manual); rebuild(); toast("Записано. Рамката е калибрирана."); });
-  }
-
   // ---------- изглед ----------
   function fmtMin(m) { var mm = Math.floor(m), ss = Math.round((m - mm) * 60); if (ss === 60) { mm++; ss = 0; } return mm + ":" + (ss < 10 ? "0" : "") + ss; }
   function render(t) {
@@ -381,7 +369,18 @@
 
   // ---------- връзки ----------
   $("go").onclick = function () { (watchId != null || demoTimer) ? stop() : start(); };
-  $("cal").onclick = calibrate;
+  // UI trial only: no reporting requests, GPS access or persistent storage.
+  $("reportBtn").onclick = function () { $("reportNotice").hidden = true; $("reportPanel").showModal(); };
+  $("reportClose").onclick = function () { $("reportPanel").close(); };
+  $("reportPanel").onclick = function (e) { if (e.target === this) this.close(); };
+  document.querySelectorAll("[data-report]").forEach(function (button) {
+    button.onclick = function () {
+      $("reportPanel").close();
+      $("reportMessage").textContent = "Тест: " + button.dataset.report + " — не се изпраща.";
+      $("reportNotice").hidden = false;
+    };
+  });
+  $("reportUndo").onclick = function () { $("reportNotice").hidden = true; toast("Тестовият сигнал е отменен."); };
   $("shareBtn").onclick = async function () {
     var url = "https://sredna-skorost.netlify.app/";
     if (navigator.share) {

@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-gantry-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icon-gantry-180.png">
-<link rel="stylesheet" href="lib/maplibre-gl.css?v=2026.11.15-6">
+<link rel="stylesheet" href="lib/maplibre-gl.css?v=2026.11.15-8">
 <style>
 :root{--bg:#eef1f4;--panel:#fffffff2;--line:#d8dee6;--tx:#1f2933;--mut:#5f6b7a;--ok:#188038;--warn:#e37400;--bad:#d93025;--acc:#1a73e8;
   --st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);--sl:env(safe-area-inset-left,0px);--sr:env(safe-area-inset-right,0px)}
@@ -66,10 +66,18 @@ button:active{transform:scale(.97)}
 #center.off{color:var(--acc);border-color:var(--acc)}
 /* долна лента */
 .bottom{position:fixed;left:calc(var(--sl) + 10px);right:calc(var(--sr) + 10px);bottom:calc(var(--sb) + 10px);z-index:3;display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.bottom button{padding:15px;font-weight:600;font-size:16px}
-#go.on{background:#d93025;border-color:#d93025;color:#fff}
-#go:not(.on){background:#188038;border-color:#188038;color:#fff}
-.bottom button{box-shadow:0 2px 8px #0003}
+/* Tinted glass keeps labels legible over both light and dark map tiles. */
+.bottom button{position:relative;isolation:isolate;overflow:hidden;min-height:54px;padding:15px;font-weight:650;font-size:16px;border-radius:18px;color:#fff;border:1px solid #ffffff70;background:linear-gradient(155deg,rgb(var(--glass-rgb) / .78),rgb(var(--glass-deep) / .94));backdrop-filter:blur(16px) saturate(150%);-webkit-backdrop-filter:blur(16px) saturate(150%);box-shadow:inset 0 1px 0 #ffffff70,inset 0 -1px 0 #0002,0 5px 14px rgb(var(--glass-deep) / .28);text-shadow:0 1px 2px #0005;transition:transform 160ms cubic-bezier(.2,.8,.2,1),box-shadow 160ms ease-out}
+#go{--glass-rgb:22 132 76;--glass-deep:12 86 49}
+#go.on{--glass-rgb:210 57 55;--glass-deep:147 28 32}
+#reportBtn{--glass-rgb:40 112 227;--glass-deep:26 62 151}
+.bottom button::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(180deg,#ffffff35 0%,#ffffff08 48%,transparent 49%);border-radius:inherit}
+.bottom button::after{content:"";position:absolute;inset:-50% -30%;z-index:-1;pointer-events:none;background:linear-gradient(110deg,transparent 35%,#ffffff30 49%,transparent 63%);transform:translateX(-110%);animation:button-sheen 850ms ease-out 200ms both}
+@keyframes button-sheen{to{transform:translateX(110%)}}
+.bottom button:active{transform:translateY(1px) scale(.965);box-shadow:inset 0 2px 5px #0003,0 2px 5px #0002}
+.bottom button:focus-visible{outline:3px solid var(--tx);outline-offset:3px;transition:none}
+@media(hover:hover) and (pointer:fine){.bottom button:hover{transform:translateY(-2px);box-shadow:inset 0 1px 0 #ffffff90,0 8px 20px rgb(var(--glass-deep) / .38)}.bottom button:hover:active{transform:translateY(1px) scale(.965)}}
+@media(prefers-reduced-motion:reduce){.bottom button{transition:none}.bottom button::after{animation:none}.bottom button:active,.bottom button:hover{transform:none}}
 .chips{position:fixed;right:calc(var(--sr) + 10px);bottom:calc(var(--sb) + 256px);z-index:3;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
 .chip{font-size:11px;color:var(--mut);background:var(--panel);border:1px solid var(--line);border-radius:99px;padding:2px 8px;white-space:nowrap}
 .chip.ok{color:var(--ok);border-color:#9fd3ae}.chip.bad{color:var(--bad);border-color:#f0a8a2}
@@ -189,6 +197,18 @@ body.navigating #installEntry,body:has(#go.on) #installEntry{display:none}
 #installHelp::backdrop{background:#0008}
 #installHelp h3{margin-bottom:12px}#installHelp p{line-height:1.5}
 #installHelp form{margin-top:18px;text-align:right}
+
+#reportPanel{position:fixed;inset:auto 0 0;margin:0 auto;width:100%;max-width:480px;max-height:90dvh;overflow:auto;border:0;border-radius:24px 24px 0 0;padding:14px max(16px,var(--sl)) calc(16px + var(--sb));background:var(--panel);color:var(--tx)}
+#reportPanel{background:#fff}html.dark #reportPanel{background:#26314f}
+#reportPanel::backdrop{background:#0005}
+#reportPanel h3{margin:0 0 14px;font-size:21px}
+.reportChoices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.reportChoices button{padding:14px 4px;min-height:106px;border:0;background:#edf3ff;color:#17233b;font-size:14px;line-height:1.3;font-weight:600}
+.reportChoices span{display:flex;height:44px;align-items:center;justify-content:center;font-size:30px;margin-bottom:8px}
+.reportChoices svg{width:44px;height:44px}
+#reportClose{display:block;margin:12px auto 0;min-height:44px;border:0;background:transparent;color:var(--mut)}
+#reportNotice{position:fixed;left:12px;right:12px;bottom:calc(var(--sb) + 82px);z-index:8;max-width:460px;margin:auto;padding:12px 14px;border-radius:14px;background:#17233b;color:#fff;box-shadow:0 3px 12px #0003;display:flex;gap:10px;align-items:center;justify-content:space-between;font-size:14px}
+#reportNotice[hidden]{display:none}#reportUndo{min-height:44px;border:0;background:transparent;color:#b9d6ff;font-weight:600;padding:8px}
 </style>
 </head>
 <body>
@@ -230,7 +250,7 @@ body.navigating #installEntry,body:has(#go.on) #installEntry{display:none}
 
 <div class="bottom" id="bottomBar">
   <button id="go">Старт</button>
-  <button id="cal">Тук е рамка</button>
+  <button id="reportBtn" aria-haspopup="dialog">Сигнализирай</button>
 </div>
 
 <div class="card prev" id="prev" hidden>
@@ -285,9 +305,20 @@ body.navigating #installEntry,body:has(#go.on) #installEntry{display:none}
   <h3>Как работи</h3>
   <p>Приложението следи <b>отсечките за средна скорост</b> по магистралите и първокласните пътища и показва средната ти скорост, оставащите километри и с колко най-много да караш до края.</p>
   <p>Дръж <b>екрана включен</b> и приложението отворено — в браузъра GPS спира на заден план.</p>
-  <p>Координатите са от официалната карта на НТУ или картографирани рамки в OpenStreetMap. При необходимост можеш да уточниш позиция с <b>„Тук е рамка“</b>. Точността зависи и от GPS сигнала.</p>
+  <p>Координатите са от официалната карта на НТУ или картографирани рамки в OpenStreetMap. Точността зависи и от GPS сигнала.</p>
   <div class="btns"><button id="introOk" style="background:#188038;border-color:#188038;color:#fff">Разбрах</button></div>
 </div></div>
+
+<dialog id="reportPanel" aria-labelledby="reportTitle">
+  <h3 id="reportTitle">Сигнализирай</h3>
+  <div class="reportChoices">
+    <button type="button" data-report="Полиция"><span aria-hidden="true">👮</span>Полиция</button>
+    <button type="button" data-report="Инцидент"><span aria-hidden="true">⚠️</span>Инцидент</button>
+    <button type="button" data-report="Мобилна камера"><span><svg viewBox="0 0 60 60" aria-hidden="true"><path d="M30 30V53M30 33L13 56M30 33L47 56" fill="none" stroke="#334155" stroke-width="4" stroke-linecap="round"/><rect x="10" y="6" width="40" height="26" rx="5" fill="#475569" stroke="#17233b" stroke-width="2"/><circle cx="36" cy="19" r="8" fill="#bfdbfe" stroke="#17233b" stroke-width="3"/><circle cx="36" cy="19" r="3" fill="#2563eb"/><rect x="16" y="12" width="8" height="5" rx="1" fill="#e2e8f0"/></svg></span>Мобилна камера</button>
+  </div>
+  <button id="reportClose" type="button">Отказ</button>
+</dialog>
+<div id="reportNotice" hidden><span id="reportMessage" role="status" aria-live="polite"></span><button id="reportUndo" type="button">Отмени</button></div>
 
 <dialog id="installHelp" aria-labelledby="installTitle" aria-describedby="installSteps">
   <h3 id="installTitle">Добави на началния екран</h3>
@@ -297,19 +328,19 @@ body.navigating #installEntry,body:has(#go.on) #installEntry{display:none}
 <div class="toast" id="toast"></div>
 
 </div>
-<script src="install.js?v=2026.11.15-6"></script>
-<script src="viewport.js?v=2026.11.15-6"></script>
-<script src="lib/maplibre-gl.js?v=2026.11.15-6"></script>
-<script src="towns.js?v=2026.11.15-6"></script>
-<script src="data.js?v=2026.11.15-6"></script>
-<script src="roadlim.js?v=2026.11.15-6"></script>
-<script src="cameras.js?v=2026.11.15-6"></script>
-<script src="geometry.js?v=2026.11.15-6"></script>
-<script src="direction-geometry.js?v=2026.11.15-6"></script>
-<script src="core.js?v=2026.11.15-6"></script>
-<script src="app.js?v=2026.11.15-6"></script>
-<script src="map.js?v=2026.11.15-6"></script>
-<script src="navcore.js?v=2026.11.15-6"></script>
-<script src="nav.js?v=2026.11.15-6"></script>
+<script src="install.js?v=2026.11.15-8"></script>
+<script src="viewport.js?v=2026.11.15-8"></script>
+<script src="lib/maplibre-gl.js?v=2026.11.15-8"></script>
+<script src="towns.js?v=2026.11.15-8"></script>
+<script src="data.js?v=2026.11.15-8"></script>
+<script src="roadlim.js?v=2026.11.15-8"></script>
+<script src="cameras.js?v=2026.11.15-8"></script>
+<script src="geometry.js?v=2026.11.15-8"></script>
+<script src="direction-geometry.js?v=2026.11.15-8"></script>
+<script src="core.js?v=2026.11.15-8"></script>
+<script src="app.js?v=2026.11.15-8"></script>
+<script src="map.js?v=2026.11.15-8"></script>
+<script src="navcore.js?v=2026.11.15-8"></script>
+<script src="nav.js?v=2026.11.15-8"></script>
 </body>
 </html>
