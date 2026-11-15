@@ -184,9 +184,8 @@
   // ---------- по време на движение ----------
   var lastPr = null;
   function onFix(fix) {
-    if (!route) return null;
+    if (!route || !active || !Number.isFinite(fix.acc) || fix.acc > 30) return null;
     var p = [fix.lat, fix.lon], pr = NC.progress(route, p, lastIdx);
-    if (!active) return pr.off < 35 ? pr.snapped : null;
     lastIdx = pr.idx;
     var acc = fix.acc || 0, speed = App.tracker().speed;
     if (pr.off > 60 && acc < 40) offCount++; else if (pr.off < 35) offCount = 0;

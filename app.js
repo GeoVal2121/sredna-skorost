@@ -2,7 +2,7 @@
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
   // ---------- нова версия: ако телефонът е запазил стара, презарежда се автоматично ----------
-  var APP_VERSION = "2026.11.15-1";
+  var APP_VERSION = "2026.11.15-2";
   try {
     fetch("version.json?t=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
       if (j && j.v && j.v !== APP_VERSION && sessionStorage.getItem("ss_reload") !== j.v) {
@@ -159,12 +159,24 @@
   }
 
   // ---------- позиция ----------
-  // без нов сигнал над 3 с – знак „няма сигнал“ (стрелката продължава по пътя)
+  // без нов сигнал над 3 с – знак „няма сигнал“; стрелката не продължава с измислена скорост
   var lastRecv = 0;
   setInterval(function () {
     if (watchId != null && lastRecv && Date.now() - lastRecv > 3000) { var g = $("gps"); g.textContent = "GPS: няма сигнал"; g.className = "chip bad"; }
   }, 1000);
   function onFix(fix) {
+    var g = $("gps"), previous = tracker.last;
+    if (!Number.isFinite(fix.lat) || Math.abs(fix.lat) > 90 || !Number.isFinite(fix.lon) || Math.abs(fix.lon) > 180 ||
+        !Number.isFinite(fix.t) || !Number.isFinite(fix.acc) || fix.acc < 0 || fix.acc > 100) {
+      g.textContent = Number.isFinite(fix.acc) && fix.acc > 100 ? "GPS ±" + r0(fix.acc) + " м · неточен" : "GPS: невалидна позиция";
+      g.className = "chip bad"; return;
+    }
+    if (previous && fix.t <= previous.t) return;
+    if (!demoTimer && Date.now() - fix.t > 5000) { g.textContent = "GPS: остаряла позиция"; g.className = "chip bad"; return; }
+    if (previous && !demoTimer && SSCore.dist(previous.p, [fix.lat, fix.lon]) > 90 * ((fix.t - previous.t) / 1000) + fix.acc + (lastFix ? lastFix.acc : 0)) {
+      g.textContent = "GPS: скок в позицията"; g.className = "chip bad"; return;
+    }
+    if (!Number.isFinite(fix.speed) || fix.speed < 0) fix.speed = null;
     lastFix = fix; lastRecv = Date.now();
     var evs = tracker.feed(fix);
     evs.forEach(onEvent);
@@ -356,7 +368,9 @@
     }, 50);
   }
   function stopDemo() {
-    if (demoTimer) { clearInterval(demoTimer); demoTimer = null; $("go").textContent = "Старт"; $("go").classList.remove("on"); }
+    if (demoTimer) { clearInterval(demoTimer); demoTimer = null; tracker.reset(); lastFix = null;
+      if (window.SSMap) SSMap.resetTrack();
+      render(Date.now()); $("go").textContent = "Старт"; $("go").classList.remove("on"); }
   }
 
   // ---------- връзки ----------

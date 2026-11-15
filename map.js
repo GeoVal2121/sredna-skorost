@@ -3,7 +3,7 @@
   "use strict";
   var App = window.SSApp, $ = function (id) { return document.getElementById(id); };
   var map = null, ready = false, follow = true, track = [], car = null, carEl = null;
-  var heading = 0, lastP = null, lastActiveId = null, offline = false, handlers = false;
+  var heading = 0, headingAnchor = null, hasHeading = false, lastP = null, lastActiveId = null, offline = false, handlers = false;
   var routeLine = null, destMarker = null, touching = false, refollowT = null, userZoomUntil = 0, pressT = null, pressXY = null;
   var selectedPitch = null;
   function targetPitch() { return selectedPitch == null ? (App.cfg.headUp ? 50 : 0) : selectedPitch; }
@@ -228,6 +228,21 @@
     return (Math.atan2(y, x) / r + 360) % 360;
   }
 
+  function updateHeading(fix) {
+    var p = [fix.lat, fix.lon], acc = fix.acc;
+    if (!Number.isFinite(acc) || acc > 30) return;
+    var anchor = { p: p, acc: acc, t: fix.t };
+    if (Number.isFinite(fix.speed) && fix.speed < 0.7) { headingAnchor = anchor; return; }
+    if (Number.isFinite(fix.heading) && fix.heading >= 0 && fix.heading < 360 && fix.speed > 2) {
+      heading = fix.heading; hasHeading = true; headingAnchor = anchor; return;
+    }
+    if (!headingAnchor || fix.t - headingAnchor.t > 15000) { headingAnchor = anchor; return; }
+    // Accumulate small movements; displacement must exceed the reported GPS uncertainty.
+    if (SSCore.dist(headingAnchor.p, p) >= Math.max(8, headingAnchor.acc + acc)) {
+      heading = bearingDeg(headingAnchor.p, p); hasHeading = true; headingAnchor = anchor;
+    }
+  }
+
   // ---------- плавно движение: стрелката и камерата се интерполират между GPS точките ----------
   // без закъснение: стрелката се плъзга ~0,35 с към новата точка и продължава напред със скоростта и посоката (до 1,2 с без нов сигнал)
   var anim = { from: null, to: null, h0: 0, h1: 0, t0: 0, dur: 350, lastFix: 0, v: 0, vh: 0, age: 0, path: null, dr: false }, raf = null, camBearing = null, easing = false;
@@ -240,18 +255,19 @@
   function along(path, d) {
     for (var i = 1; i < path.length; i++) {
       var a = path[i - 1], b = path[i], l = SSCore.dist(a, b);
+      if (l < 0.01) continue;
       if (d <= l || i === path.length - 1) { var f = l ? Math.min(1, d / l) : 0; return { p: [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f], h: bearingDeg(a, b) }; }
       d -= l;
     }
     return { p: path[0], h: null };
   }
   // позиция на стрелката: плъзгане към новата точка + напред по скоростта, като се добавя и закъснението на точката (age);
-  // без сигнал над 1,5 с (тунел) – продължава по пътя/маршрута с последната скорост до 60 с
+  // Предвижда най-много 1,5 с; без нов GPS спира, вместо да измисля движение в тунел.
   function animPos(now) {
     var t = Math.min(1, (now - anim.t0) / anim.dur), f = anim.from, g = anim.to, h1 = anim.h1;
     var dt = (now - anim.t0) / 1000 + anim.age;
-    anim.dr = anim.v > 4 && dt > 1.5 && !!anim.path;
-    if (anim.dr) { var a = along(anim.path, anim.v * Math.min(dt, 60)); g = a.p; if (a.h != null) h1 = a.h; }
+    anim.dr = dt > 1.5;
+    if (anim.path && anim.v > 0.7) { var a = along(anim.path, anim.v * Math.min(dt, 1.5)); g = a.p; if (a.h != null) h1 = a.h; }
     else if (anim.v > 0.7) g = ahead(g, anim.vh, anim.v * Math.min(1.5, dt));
     return { p: [f[0] + (g[0] - f[0]) * t, f[1] + (g[1] - f[1]) * t], h: lerpAngle(anim.h0, h1, t), t: t };
   }
@@ -260,7 +276,7 @@
     raf = null; if (!anim.to) return;
     var now = performance.now(), c = animPos(now);
     car.setLngLat([c.p[1], c.p[0]]).setRotation(c.h);
-    carEl.style.opacity = anim.dr ? "0.55" : "";
+    carEl.style.opacity = anim.dr || anim.uncertain || !hasHeading ? "0.55" : "";
     if (follow && !touching && !easing) {
       var up = App.cfg.headUp, moving = App.tracker().speed > 8;
       if (camBearing == null) camBearing = map.getBearing();
@@ -274,7 +290,7 @@
       map.jumpTo(opt);
     }
     // анимира докато има движение; спира, ако GPS мълчи над 3 сек.
-    if (c.t < 1 || now - anim.lastFix < (anim.v > 4 ? 61000 : 3000)) raf = requestAnimationFrame(frame);
+    if (c.t < 1 || now - anim.lastFix < 3000) raf = requestAnimationFrame(frame);
   }
 
   // без маршрут следата се прилепва към пътя от картата: най-близкият път до 20 м в посоката на движение,
@@ -296,7 +312,7 @@
         for (var i = 1; i < line.length; i++) {
           var r = proj(p, line[i - 1], line[i]), pen = 0;
           if (r.d > 20) continue;
-          if (h != null) { var diff = Math.abs(((bearingDeg(line[i - 1], line[i]) - h) % 360 + 540) % 360 - 180); if (diff > 50 && diff < 130) pen = 12; }
+          if (h != null) { var diff = Math.abs(((bearingDeg(line[i - 1], line[i]) - h) % 360 + 540) % 360 - 180); if (diff > 50 && diff < 130) continue; pen = Math.min(diff, 180 - diff) / 5; }
           if (!best || r.d + pen < best.s) best = { s: r.d + pen, pt: r.q, line: line, i: i, t: r.t };
         }
       });
@@ -304,8 +320,8 @@
     return best;
   }
   // път напред за движение без сигнал: маршрутът при навигация, иначе пътят от картата в посоката на движение
-  function forwardPath(sn, h) {
-    if (routeLine && routeHead) return [routeHead].concat(routeLine.slice(routeFrom + 1, routeFrom + 400));
+  function forwardPath(sn, h, onRoute) {
+    if (onRoute && routeLine && routeHead) return [routeHead].concat(routeLine.slice(routeFrom + 1, routeFrom + 400));
     if (!sn) return null;
     var a = sn.line[sn.i - 1], b = sn.line[sn.i];
     var fwd = h == null || Math.abs(((bearingDeg(a, b) - h) % 360 + 540) % 360 - 180) < 90;
@@ -329,25 +345,35 @@
 
   function onFix(fix, snap) {
     if (!map) return;
-    var p = snap || [fix.lat, fix.lon];
-    if (fix.heading != null && !isNaN(fix.heading) && (fix.speed || 0) > 2) heading = fix.heading;
-    else if (lastP && SSCore.dist(lastP, p) > 8) heading = bearingDeg(lastP, p);
+    var raw = [fix.lat, fix.lon], accurate = Number.isFinite(fix.acc) && fix.acc <= 30;
+    updateHeading(fix);
+    var hh = hasHeading ? heading : null, path = null;
+    if (snap && accurate && hasHeading) {
+      trimRoute(snap);
+      path = forwardPath(null, hh, true);
+      // A planned route is not evidence that the vehicle follows it (or its direction).
+      if (!path || path.length < 2 || along(path, 0).h == null || Math.abs(((along(path, 0).h - heading + 540) % 360) - 180) > 50) {
+        snap = null; path = null;
+      }
+    } else snap = null;
+    var sn = !snap && accurate && hasHeading ? roadSnap(raw, hh) : null;
+    var p = snap || (sn ? sn.pt : raw);
+    if (!path) path = forwardPath(sn, hh, false);
+    var stopped = Number.isFinite(fix.speed) && fix.speed < 0.7;
+    if (path && path.length > 1 && !stopped && along(path, 0).h != null) heading = along(path, 0).h;
     var moved = !lastP || SSCore.dist(lastP, p) > 8;
-    lastP = p;
-    trimRoute(p);
-    // следа само от точни позиции (или прилепени към маршрута)
-    var hh = (fix.speed || 0) > 2 ? heading : null, sn = snap ? null : roadSnap(p, hh);
-    if (moved && (snap || !fix.acc || fix.acc <= 25)) {
+    if (moved && accurate) {
       if (snap) { track.push([p[1], p[0]]); prevSnap = null; if (track.length > 6000) track.shift(); }
       else addTrack(p, hh, sn);
+      lastP = p;
     }
-    if (!car) car = new maplibregl.Marker({ element: carEl, rotationAlignment: "map", pitchAlignment: "viewport" }).setLngLat([p[1], p[0]]).addTo(map);
+    if (!car) car = new maplibregl.Marker({ element: carEl, rotationAlignment: "map", pitchAlignment: "map" }).setLngLat([p[1], p[0]]).addTo(map);
     var now = performance.now(), cur = anim.to ? animPos(now) : { p: p, h: heading };
     if (anim.to && SSCore.dist(cur.p, p) > 2000) cur = { p: p, h: heading }; // голям скок (демо, нов маршрут) — без анимация
     anim.from = cur.p; anim.h0 = cur.h; anim.to = p; anim.h1 = heading; anim.t0 = now;
-    anim.v = (App.tracker().speed || 0) / 3.6; anim.vh = heading; anim.lastFix = now;
+    anim.v = accurate && hasHeading && !stopped ? (App.tracker().speed || 0) / 3.6 : 0; anim.vh = heading; anim.lastFix = now;
     anim.age = fix.t ? Math.max(0, Math.min(1.5, (Date.now() - fix.t) / 1000)) : 0;
-    anim.path = forwardPath(sn, heading); if (anim.path) anim.path[0] = p;
+    anim.path = path; anim.uncertain = !accurate;
     if (!raf) raf = requestAnimationFrame(frame);
     if (ready) {
       map.getSource("trk").setData(trackGeo());
@@ -370,7 +396,7 @@
     if (map.getSource("cams")) map.getSource("cams").setData(camsGeo());
     map.getSource("secs").setData(sectionsGeo(lastActiveId));
   }
-  function resetTrack() { track = []; prevSnap = null; lastP = null; anim.to = null; anim.lastFix = 0; if (ready) map.getSource("trk").setData(trackGeo()); setFollow(true); }
+  function resetTrack() { track = []; prevSnap = null; lastP = null; headingAnchor = null; hasHeading = false; heading = 0; anim.to = null; anim.lastFix = 0; if (ready) map.getSource("trk").setData(trackGeo()); setFollow(true); }
 
   // вид на пътя под точката и дали е в населено място (жилищна зона или сгради наоколо) – от картата
   function roadAt(p) {
