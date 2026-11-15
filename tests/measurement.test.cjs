@@ -11,3 +11,7 @@ assert(measure('M:Момково','M:Свиленград').error);assert.equal(
 assert.equal(measure('H:Девня','H:Игнатиево').total,17.875);
 assert.equal(measure('I-5:Самоводене').total,0);assert.equal(measure().total,0);
 console.log('PASS measurement: endpoints/automatic intermediate sections, incremental sum, reverse, excluded gaps/upcoming, road mismatch, duplicate coverage, published lengths');
+
+assert.match(measure('T:Крушовица','I-5:Самоводене').error,/няма сертифицирана отсечка/);
+assert.match(measure('T:Крушовица','T:Вакарел','I-5:Самоводене').error,/В момента измервате друго разстояние/);
+assert.match(measure('T:Ихтиман','T:Щърково').error,/няма сертифицирана отсечка/);

@@ -38,7 +38,7 @@
     var result = { sections: [], points: keys.length ? [keys[0]] : [], total: 0, gaps: 0, error: null };
     for (var i = 1; i < keys.length; i++) {
       var start = model.points[keys[i - 1]], end = model.points[keys[i]], road = keys[i - 1].split(":")[0];
-      if (!start || !end || keys[i].split(":")[0] !== road || start.km === end.km) { result.error = "В момента измервате друго разстояние. Натиснете „Изчисти“ и изберете две сини точки в участъка, който искате да измерите."; return result; }
+      if (!start || !end || keys[i].split(":")[0] !== road || start.km === end.km) { result.error = result.sections.length ? "В момента измервате друго разстояние. Натиснете „Изчисти“ и изберете две сини точки в участъка, който искате да измерите." : "Между тези точки няма сертифицирана отсечка в избраната посока."; return result; }
       var sign = end.km > start.km ? 1 : -1;
       var legs = model.sections.filter(function (s) {
         var a = model.points[s.fromKey].km, b = model.points[s.toKey].km;
