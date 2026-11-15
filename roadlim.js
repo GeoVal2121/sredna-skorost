@@ -46,11 +46,11 @@
   // плочката под позицията (и съседната, ако сте на по-малко от ~5 км от ръба) се зарежда при нужда и остава в паметта
   var BASE = "lim/", index = null, tiles = {}, shown = null, cand = null, candN = 0;
   function tileKey(la, lo) { return Math.floor(la * 2) + "_" + Math.floor(lo * 2); }
-  function ensure(p) {
+  function ensure(p, onReady) {
     if (index === null) {
       index = false;
       fetch(BASE + "index.json").then(function (r) { return r.json(); })
-        .then(function (j) { index = {}; j.tiles.forEach(function (k) { index[k] = 1; }); })
+        .then(function (j) { index = {}; j.tiles.forEach(function (k) { index[k] = 1; }); ensure(p, onReady); })
         .catch(function () { index = null; });
       return;
     }
@@ -61,16 +61,23 @@
       tiles[k] = null;
       (function (k) {
         fetch(BASE + k + ".json").then(function (r) { return r.json(); })
-          .then(function (a) { tiles[k] = a.map(way); })
+          .then(function (a) { tiles[k] = a.map(way); if (onReady) onReady(); })
           .catch(function () { delete tiles[k]; });
       })(k);
     }
   }
-  function waysAt(p) { return tiles[tileKey(p[0], p[1])] || []; }
+  function waysAt(p) {
+    var keys = {}, ways = [];
+    for (var di = -1; di <= 1; di++) for (var dj = -1; dj <= 1; dj++) {
+      var k = tileKey(p[0] + di * 0.05, p[1] + dj * 0.07);
+      if (!keys[k] && tiles[k]) { keys[k] = true; ways = ways.concat(tiles[k]); }
+    }
+    return ways;
+  }
 
   // roadAt(p) → { cls, urban } от картата (по желание)
-  function feed(p, heading, kmh, roadAt) {
-    ensure(p);
+  function feed(p, heading, kmh, roadAt, onReady) {
+    ensure(p, onReady);
     var v = match(waysAt(p), p, kmh > 7 ? heading : null);
     if (!v && roadAt) {
       var r = roadAt(p);
@@ -78,6 +85,7 @@
       else if (r && r.cls === "minor" && r.urban) v = 50;
     }
     v = v || null;
+    if (shown === null && v !== null) { shown = v; candN = 0; return shown; }
     if (v === shown) { candN = 0; return shown; }
     if (v === cand) candN++; else { cand = v; candN = 1; }
     if (candN >= 2) { shown = v; candN = 0; }

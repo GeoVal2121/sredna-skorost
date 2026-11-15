@@ -2,7 +2,7 @@
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
   // ---------- нова версия: ако телефонът е запазил стара, презарежда се автоматично ----------
-  var APP_VERSION = "2026.11.15-16";
+  var APP_VERSION = "2026.11.15-17";
   try {
     fetch("version.json?t=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
       if (j && j.v && j.v !== APP_VERSION && sessionStorage.getItem("ss_reload") !== j.v) {
@@ -145,11 +145,14 @@
   // ---------- ограничение на пътя ----------
   // знак до километража; при превишаване с 5+ км/ч – червен километраж, сигнал и глас (повтор след 30 с)
   var rlOver = 0, rlSaid = 0, rlSaidLim = null;
-  function roadLimit(fix) {
-    var box = $("roadLim"), lim = cfg.roadLim && window.SSRoadLim ? SSRoadLim.feed([fix.lat, fix.lon], fix.heading, tracker.speed, window.SSMap && SSMap.roadAt) : null;
+  function roadLimit(fix, dataLoaded) {
+    var box = $("roadLim"), lim = cfg.roadLim && window.SSRoadLim ? SSRoadLim.feed([fix.lat, fix.lon], fix.heading, tracker.speed, window.SSMap && SSMap.roadAt, function () {
+      if (lastFix && (demoTimer || (watchId != null && Date.now() - lastFix.t <= 5000))) roadLimit(lastFix, true);
+    }) : null;
     box.hidden = !lim; if (lim) box.textContent = lim;
     var over = !!lim && tracker.speed >= lim + 5;
     $("spdBox").classList.toggle("limover", over);
+    if (dataLoaded) return;
     rlOver = over ? rlOver + 1 : 0;
     if (rlOver >= 2 && (lim !== rlSaidLim || fix.t - rlSaid > 30000)) {
       rlSaid = fix.t; rlSaidLim = lim;
