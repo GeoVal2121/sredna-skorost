@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-gantry-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icon-gantry-180.png">
-<link rel="stylesheet" href="lib/maplibre-gl.css?v=2026.11.15-5">
+<link rel="stylesheet" href="lib/maplibre-gl.css?v=2026.11.15-6">
 <style>
 :root{--bg:#eef1f4;--panel:#fffffff2;--line:#d8dee6;--tx:#1f2933;--mut:#5f6b7a;--ok:#188038;--warn:#e37400;--bad:#d93025;--acc:#1a73e8;
   --st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);--sl:env(safe-area-inset-left,0px);--sr:env(safe-area-inset-right,0px)}
@@ -266,6 +266,7 @@ body.navigating #installEntry,body:has(#go.on) #installEntry{display:none}
   <div class="row"><span>Ограничение на пътя (знак и предупреждение)</span><input type="checkbox" id="roadLimOn"></div>
   <div class="btns">
     <button id="clrBtn">Изтрий калибрациите</button>
+    <button id="helpBtn">Как работи</button>
     <button id="demoBtn">Демо пътуване</button>
     <button id="testVoice">Тест на гласа</button>
   </div>
@@ -280,7 +281,7 @@ body.navigating #installEntry,body:has(#go.on) #installEntry{display:none}
   <div class="btns"><button id="dlgNo">Отказ</button><button id="dlgYes" style="background:#188038;border-color:#188038;color:#fff">Запиши</button></div>
 </div></div>
 
-<div class="sheet show intro" id="intro"><div>
+<div class="sheet intro" id="intro"><div>
   <h3>Как работи</h3>
   <p>Приложението следи <b>отсечките за средна скорост</b> по магистралите и първокласните пътища и показва средната ти скорост, оставащите километри и с колко най-много да караш до края.</p>
   <p>Дръж <b>екрана включен</b> и приложението отворено — в браузъра GPS спира на заден план.</p>
@@ -296,19 +297,19 @@ body.navigating #installEntry,body:has(#go.on) #installEntry{display:none}
 <div class="toast" id="toast"></div>
 
 </div>
-<script src="install.js?v=2026.11.15-5"></script>
-<script src="viewport.js?v=2026.11.15-5"></script>
-<script src="lib/maplibre-gl.js?v=2026.11.15-5"></script>
-<script src="towns.js?v=2026.11.15-5"></script>
-<script src="data.js?v=2026.11.15-5"></script>
-<script src="roadlim.js?v=2026.11.15-5"></script>
-<script src="cameras.js?v=2026.11.15-5"></script>
-<script src="geometry.js?v=2026.11.15-5"></script>
-<script src="direction-geometry.js?v=2026.11.15-5"></script>
-<script src="core.js?v=2026.11.15-5"></script>
-<script src="app.js?v=2026.11.15-5"></script>
-<script src="map.js?v=2026.11.15-5"></script>
-<script src="navcore.js?v=2026.11.15-5"></script>
-<script src="nav.js?v=2026.11.15-5"></script>
+<script src="install.js?v=2026.11.15-6"></script>
+<script src="viewport.js?v=2026.11.15-6"></script>
+<script src="lib/maplibre-gl.js?v=2026.11.15-6"></script>
+<script src="towns.js?v=2026.11.15-6"></script>
+<script src="data.js?v=2026.11.15-6"></script>
+<script src="roadlim.js?v=2026.11.15-6"></script>
+<script src="cameras.js?v=2026.11.15-6"></script>
+<script src="geometry.js?v=2026.11.15-6"></script>
+<script src="direction-geometry.js?v=2026.11.15-6"></script>
+<script src="core.js?v=2026.11.15-6"></script>
+<script src="app.js?v=2026.11.15-6"></script>
+<script src="map.js?v=2026.11.15-6"></script>
+<script src="navcore.js?v=2026.11.15-6"></script>
+<script src="nav.js?v=2026.11.15-6"></script>
 </body>
 </html>

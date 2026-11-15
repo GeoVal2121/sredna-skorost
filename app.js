@@ -2,7 +2,7 @@
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
   // ---------- нова версия: ако телефонът е запазил стара, презарежда се автоматично ----------
-  var APP_VERSION = "2026.11.15-5";
+  var APP_VERSION = "2026.11.15-6";
   try {
     fetch("version.json?t=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
       if (j && j.v && j.v !== APP_VERSION && sessionStorage.getItem("ss_reload") !== j.v) {
@@ -407,7 +407,8 @@
   $("testVoice").onclick = function () { unlockAudio(); beep(1); say("След 500 метра завийте надясно. Начало на отсечка Чирпан – Памукчии, ограничение 140.", true); };
   $("voiceSel").onchange = function () { cfg.voiceName = this.value || null; store.set("cfg", cfg); say("Здравейте. Това е гласът за навигация.", true); };
   loadVoices();
-  if (store.get("intro", 0)) { $("intro").classList.remove("show"); }
+  $("helpBtn").onclick = function () { $("sheet").classList.remove("show"); $("intro").classList.add("show"); };
+  if (!store.get("intro", 0)) { $("intro").classList.add("show"); }
 
   window.SSApp = { model: function () { return model; }, tracker: function () { return tracker; }, cfg: cfg, toast: toast, say: say,
     mapCenter: function () { return window.SSMap ? SSMap.center() : null; },
