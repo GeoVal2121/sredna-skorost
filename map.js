@@ -65,6 +65,7 @@
     return key.slice(key.indexOf(":") + 1) + " · " + SS_DATA.roads[road] + " · км " + kmLabel(p.km);
   }
   function updateMeasurement() {
+    $("measureError").hidden = true; $("measureError").textContent = "";
     var result = SSCore.measureSections(App.model(), measureKeys);
     $("measurement").hidden = !measureKeys.length;
     document.body.classList.toggle("measuring", !!measureKeys.length);
@@ -84,9 +85,14 @@
   }
   function selectMeasurePoint(key) {
     if (infoPopup) infoPopup.remove();
-    if (measureKeys[measureKeys.length - 1] === key) return;
+    if (measureKeys[measureKeys.length - 1] === key) { updateMeasurement(); return; }
     var next = measureKeys.concat(key), result = SSCore.measureSections(App.model(), next);
-    if (result.error) { App.toast(result.error); return; }
+    if (result.error) {
+      $("measureHint").hidden = true;
+      $("measureError").textContent = result.error;
+      $("measureError").hidden = false;
+      return;
+    }
     measureKeys = next; updateMeasurement();
   }
   $("measureUndo").onclick = function () { measureKeys.pop(); updateMeasurement(); };
