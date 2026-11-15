@@ -2,7 +2,7 @@
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
   // ---------- нова версия: ако телефонът е запазил стара, презарежда се автоматично ----------
-  var APP_VERSION = "2026.11.15-15";
+  var APP_VERSION = "2026.11.15-16";
   try {
     fetch("version.json?t=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
       if (j && j.v && j.v !== APP_VERSION && sessionStorage.getItem("ss_reload") !== j.v) {
@@ -162,7 +162,7 @@
   // без нов сигнал над 3 с – знак „няма сигнал“; стрелката не продължава с измислена скорост
   var lastRecv = 0;
   setInterval(function () {
-    if (watchId != null && lastRecv && Date.now() - lastRecv > 3000) { var g = $("gps"); g.textContent = "GPS: няма сигнал"; g.className = "chip bad"; }
+    if (watchId != null && lastRecv && Date.now() - lastRecv > 3000) { var g = $("gps"); g.textContent = "GPS: няма сигнал"; g.className = "chip bad"; $("spd").textContent = "–"; }
   }, 1000);
   function onFix(fix) {
     var g = $("gps"), previous = tracker.last;
@@ -274,7 +274,7 @@
   // ---------- изглед ----------
   function fmtMin(m) { var mm = Math.floor(m), ss = Math.round((m - mm) * 60); if (ss === 60) { mm++; ss = 0; } return mm + ":" + (ss < 10 ? "0" : "") + ss; }
   function render(t) {
-    $("spd").textContent = tracker.last ? r0(tracker.speed) : "–";
+    $("spd").textContent = tracker.last && tracker.speedValid && (demoTimer || Date.now() - tracker.last.t <= 3000) ? (tracker.speedEstimated ? "≈" : "") + r0(tracker.speed) : "–";
     var st = tracker.activeState(t);
     $("act").hidden = !st; $("idle").hidden = !!st;
     // километражът свети в червено, когато средната в зоната е над лимита; оранжев кант при текуща скорост над лимита

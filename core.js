@@ -93,7 +93,7 @@
     this.reset();
   }
   Tracker.prototype.reset = function () {
-    this.last = null; this.odo = 0; this.speed = 0;
+    this.last = null; this.odo = 0; this.speed = 0; this.speedValid = false; this.speedEstimated = false;
     this.near = {}; this.prevD = {}; this.cands = []; this.active = null; this.announced = {};
     this.lastOver = -1e12;
   };
@@ -103,16 +103,21 @@
   Tracker.prototype.feed = function (fix) {
     var ev = [], p = [fix.lat, fix.lon], self = this;
     if (fix.acc != null && fix.acc > 100) return ev; // твърде неточна позиция
-    var v = fix.speed;
+    var v = Number.isFinite(fix.speed) && fix.speed >= 0 && fix.speed < 90 ? fix.speed : null;
+    this.speedEstimated = false;
     if (this.last) {
       var dt = (fix.t - this.last.t) / 1000;
       if (dt <= 0) return ev;
       var dd = dist(this.last.p, p);
       if (dd / dt < 90) this.odo += dd; // отсейва скокове над ~320 км/ч
-      if (v == null || isNaN(v)) v = dd / dt;
+      // A position delta is an interval average, never a current speed after a long gap.
+      if (v == null && dt >= 0.5 && dt <= 2.5 && fix.acc <= 20 && this.last.acc <= 20 && dd / dt < 90) {
+        v = dd / dt; this.speedEstimated = true;
+      }
     }
+    this.speedValid = v != null;
     this.speed = (v || 0) * 3.6;
-    this.last = { p: p, t: fix.t };
+    this.last = { p: p, t: fix.t, acc: fix.acc };
 
     var pts = this.m.points, k;
     for (k in pts) {
