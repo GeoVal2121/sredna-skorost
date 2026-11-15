@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon-gantry-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icon-gantry-180.png">
-<link rel="stylesheet" href="lib/maplibre-gl.css?v=2026.11.15-3">
+<link rel="stylesheet" href="lib/maplibre-gl.css?v=2026.11.15-4">
 <style>
 :root{--bg:#eef1f4;--panel:#fffffff2;--line:#d8dee6;--tx:#1f2933;--mut:#5f6b7a;--ok:#188038;--warn:#e37400;--bad:#d93025;--acc:#1a73e8;
   --st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);--sl:env(safe-area-inset-left,0px);--sr:env(safe-area-inset-right,0px)}
@@ -183,6 +183,12 @@ html.dark .maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color
   .chips{bottom:calc(var(--sb) + 140px)}
   .maplibregl-ctrl-top-right{bottom:auto;top:var(--st)!important}
 }
+#installEntry{align-self:flex-start;min-height:44px;padding:8px 14px;font-size:14px;color:var(--acc)}
+body.navigating #installEntry,body:has(#go.on) #installEntry{display:none}
+#installHelp{margin:auto;width:min(420px,calc(100% - 32px));max-height:calc(100dvh - 48px);overflow:auto;background:var(--panel);color:var(--tx);border:1px solid var(--line);border-radius:18px;padding:20px}
+#installHelp::backdrop{background:#0008}
+#installHelp h3{margin-bottom:12px}#installHelp p{line-height:1.5}
+#installHelp form{margin-top:18px;text-align:right}
 </style>
 </head>
 <body>
@@ -196,6 +202,7 @@ html.dark .maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color
   </div>
   <button class="searchBtn" id="searchBtn"><svg viewBox="0 0 24 24" width="20" height="20"><circle cx="10" cy="10" r="6.5" fill="none" stroke="#5f6b7a" stroke-width="2.2"/><path d="M15 15 L21 21" stroke="#5f6b7a" stroke-width="2.4" stroke-linecap="round"/></svg>Накъде?</button>
   <div class="card" id="idle"><div id="nearest" class="mut">Натисни „Старт“, за да започне следенето.</div></div>
+  <button id="installEntry" type="button" data-install hidden>↓ Инсталирай приложението</button>
   <div class="card" id="act" hidden>
     <div class="sec-name"><div><small id="aRoad"></small><span id="aName"></span></div><div class="limit" id="aLim">140</div></div>
     <div class="bar"><i id="aBar"></i></div>
@@ -246,6 +253,7 @@ html.dark .maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color
 
 <div class="sheet" id="sheet"><div>
   <h3>Настройки</h3>
+  <button type="button" data-install hidden>Инсталирай приложението</button>
   <div class="row"><span>Резерв под ограничението</span>
     <select id="margin"><option value="0">0 км/ч</option><option value="3">3 км/ч</option><option value="5">5 км/ч</option><option value="10">10 км/ч</option></select></div>
   <div class="row"><span>Картата по посоката на движение</span><input type="checkbox" id="headUp"></div>
@@ -280,20 +288,26 @@ html.dark .maplibregl-popup-anchor-right .maplibregl-popup-tip{border-left-color
   <div class="btns"><button id="introOk" style="background:#188038;border-color:#188038;color:#fff">Разбрах</button></div>
 </div></div>
 
+<dialog id="installHelp" aria-labelledby="installTitle" aria-describedby="installSteps">
+  <h3 id="installTitle">Добави на началния екран</h3>
+  <p id="installSteps"></p>
+  <form method="dialog"><button autofocus>Разбрах</button></form>
+</dialog>
 <div class="toast" id="toast"></div>
 
 </div>
-<script src="viewport.js?v=2026.11.15-3"></script>
-<script src="lib/maplibre-gl.js?v=2026.11.15-3"></script>
-<script src="towns.js?v=2026.11.15-3"></script>
-<script src="data.js?v=2026.11.15-3"></script>
-<script src="roadlim.js?v=2026.11.15-3"></script>
-<script src="cameras.js?v=2026.11.15-3"></script>
-<script src="geometry.js?v=2026.11.15-3"></script>
-<script src="core.js?v=2026.11.15-3"></script>
-<script src="app.js?v=2026.11.15-3"></script>
-<script src="map.js?v=2026.11.15-3"></script>
-<script src="navcore.js?v=2026.11.15-3"></script>
-<script src="nav.js?v=2026.11.15-3"></script>
+<script src="install.js?v=2026.11.15-4"></script>
+<script src="viewport.js?v=2026.11.15-4"></script>
+<script src="lib/maplibre-gl.js?v=2026.11.15-4"></script>
+<script src="towns.js?v=2026.11.15-4"></script>
+<script src="data.js?v=2026.11.15-4"></script>
+<script src="roadlim.js?v=2026.11.15-4"></script>
+<script src="cameras.js?v=2026.11.15-4"></script>
+<script src="geometry.js?v=2026.11.15-4"></script>
+<script src="core.js?v=2026.11.15-4"></script>
+<script src="app.js?v=2026.11.15-4"></script>
+<script src="map.js?v=2026.11.15-4"></script>
+<script src="navcore.js?v=2026.11.15-4"></script>
+<script src="nav.js?v=2026.11.15-4"></script>
 </body>
 </html>
