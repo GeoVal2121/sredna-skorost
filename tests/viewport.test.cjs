@@ -16,3 +16,8 @@ Object.assign(viewport, { scale: 1, height: 390, width: 844, offsetTop: 0 }); pa
 assert.equal(style.width, '844px'); assert.equal(style.height, '390px'); assert.equal(style.top, '0px');
 vm.runInNewContext(source, { window: {}, document: { getElementById: () => ({ style: {} }) } });
 console.log('PASS: visible viewport, keyboard, scroll, pinch zoom, restoration, CSS fallback');
+
+const boundedStyle={},boundedEvents={};
+const win={innerHeight:560,visualViewport:{...viewport,height:700,addEventListener(){}},addEventListener:(n,f)=>boundedEvents[n]=f};
+vm.runInNewContext(source,{window:win,document:{getElementById:()=>({style:boundedStyle})}});
+assert.equal(boundedStyle.height,'560px');win.innerHeight=640;boundedEvents.resize();assert.equal(boundedStyle.height,'640px');

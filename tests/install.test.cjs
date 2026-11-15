@@ -3,10 +3,11 @@ const source = fs.readFileSync(require('node:path').join(__dirname, '../install.
 function setup(nav = {}, standalone = false) {
   const events = {}, buttons = [0,1].map(() => ({ addEventListener(n, f) { this[n] = f; } }));
   const help = { open:false, showModal(){this.open=true}, close(){this.open=false} }, text = {};
+  const handoff={},copy={addEventListener(n,f){this[n]=f}},link={focus(){},select(){this.selected=true}};
   const media = {matches:standalone,addEventListener(n,f){this.change=f}};
   vm.runInNewContext(source, {navigator:{userAgent:'Android',...nav},window:{matchMedia:()=>media,addEventListener:(n,f)=>events[n]=f},
-    document:{querySelectorAll:()=>buttons,getElementById:id=>id==='installHelp'?help:text}});
-  return {events,buttons,help,text,media};
+    document:{querySelectorAll:()=>buttons,getElementById:id=>({installHelp:help,installSteps:text,installHandoff:handoff,installCopy:copy,installLink:link,installSafari:{},installSafariTitle:{}})[id]}});
+  return {events,buttons,help,text,media,handoff,copy,link};
 }
 (async()=>{
   let s=setup(),calls=0;
@@ -24,6 +25,9 @@ function setup(nav = {}, standalone = false) {
   for(const nav of [{userAgent:'iPhone'},{userAgent:'Macintosh',platform:'MacIntel',maxTouchPoints:5}]){
     s=setup(nav);await s.buttons[0].click();assert.match(s.text.textContent,/Safari/);
   }
+  s=setup({userAgent:'iPhone',clipboard:{writeText:async u=>{assert.equal(u,'https://sredna-skorost.netlify.app/')}}});
+  await s.buttons[0].click();assert(!s.handoff.hidden);await s.copy.click();assert.match(s.copy.textContent,/Копирано/);
+  s=setup({userAgent:'iPhone'});await s.buttons[0].click();await s.copy.click();assert(!s.link.hidden&&s.link.selected);
   assert(setup({},true).buttons.every(b=>b.hidden));
   assert(setup({standalone:true}).buttons.every(b=>b.hidden));
   s=setup();s.media.matches=true;s.media.change();assert(s.buttons.every(b=>b.hidden));

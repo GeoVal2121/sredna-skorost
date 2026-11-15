@@ -6,7 +6,7 @@
   function fit() {
     // Preserve native pinch zoom instead of shrinking the interface while zoomed.
     if (viewport.scale !== 1) return;
-    frame.style.height = viewport.height + "px";
+    frame.style.height = Math.min(viewport.height, window.innerHeight || viewport.height) + "px";
     frame.style.width = viewport.width + "px";
     frame.style.top = viewport.offsetTop + "px";
     frame.style.left = viewport.offsetLeft + "px";
@@ -14,5 +14,7 @@
   viewport.addEventListener("resize", fit);
   viewport.addEventListener("scroll", fit);
   window.addEventListener("pageshow", fit);
+  window.addEventListener("resize", fit);
+  window.addEventListener("orientationchange", fit);
   fit();
 }());
