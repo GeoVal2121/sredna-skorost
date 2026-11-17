@@ -162,9 +162,22 @@
       $('warningStatus').title='Каналът е обновен на '+label(updated)+'. Липсата на предупреждение не е прогноза за безопасно време.';
     }
   }
+  var labelPaint={};
+  function labelContrast() {
+    var strong=enabled&&root.SSApp&&SSApp.isDark();
+    var contrast={'text-color':'#ffffff','text-halo-color':'#172238','text-halo-width':1.5,'text-halo-blur':0};
+    (map.getStyle().layers||[]).filter(function(l){return l.type==='symbol'&&l['source-layer']==='transportation_name';}).forEach(function(l){
+      if(strong&&!labelPaint[l.id]){
+        labelPaint[l.id]={};Object.keys(contrast).forEach(function(k){labelPaint[l.id][k]=map.getPaintProperty(l.id,k);});
+      }
+      var values=strong?contrast:labelPaint[l.id];if(!values)return;
+      Object.keys(values).forEach(function(k){map.setPaintProperty(l.id,k,values[k]===undefined?null:values[k]);});
+      if(!strong)delete labelPaint[l.id];
+    });
+  }
   function style() {
     if (!map || !map.getLayer('route')) return;
-    var before=(map.getStyle().layers||[]).find(function(l){return l.type==='line'&&l['source-layer']==='transportation';}) || (map.getStyle().layers||[]).find(function(l){return l.id==='route-case';});
+    var before=(map.getStyle().layers||[]).find(function(l){return l['source-layer']==='building'||l.type==='fill-extrusion'||(l.type==='line'&&l['source-layer']==='transportation');}) || (map.getStyle().layers||[]).find(function(l){return l.id==='route-case';});
     before=before?before.id:undefined;
     if (!map.getSource('weather-forecast')) {
       map.addSource('weather-forecast',{type:'raster',tiles:[tileURL(layer,selected)],tileSize:256,maxzoom:6,attribution:'© <a href="https://www.weatherapi.com/">WeatherAPI</a>'});
@@ -174,8 +187,11 @@
       map.addLayer({id:'weather-warning-line',type:'line',source:'weather-warnings',paint:{'line-color':['get','color'],'line-width':2.5}},before);
     }
     ['weather-forecast','weather-warning-fill','weather-warning-line'].forEach(function(id){map.setLayoutProperty(id,'visibility',enabled?'visible':'none');});
+    labelContrast();
     updateWarnings();
     if(root.SSWeatherZones)SSWeatherZones.show(enabled&&layer==='precip',selected);
+    // A theme reload can recreate the canvas before the warning layers exist.
+    if(map.getLayer('weather-zones'))map.moveLayer('weather-zones','weather-warning-fill');
   }
   function forecast() {
     tileFailed=false;badge();
@@ -216,7 +232,7 @@
   api.mount=function(m){
     map=m;
     if(root.SSWeatherZones){SSWeatherZones.onstatus=badge;SSWeatherZones.mount(m);}
-    map.on('style.load',function(){if(enabled)style();});
+    map.on('style.load',function(){labelPaint={};if(enabled)style();});
     map.on('error',function(e){if(enabled && e.sourceId==='weather-forecast'){tileFailed=true;badge();$('weatherStatus').textContent='Прогнозният слой не е достъпен за този час.';}});
     map.on('sourcedata',function(e){if(enabled && e.sourceId==='weather-forecast' && e.isSourceLoaded && !tileFailed)$('weatherStatus').textContent='Прогнозен модел · обща картина, не точност по улици';});
     map.on('click','weather-warning-fill',function(e){
