@@ -23,8 +23,10 @@
 #weatherList{padding-left:18px}
 #weatherList button{padding:6px;text-align:left;font-size:13px;margin:3px 0}
 body.weather-open .spdw,body.weather-open .side{bottom:calc(var(--sb) + 166px)}
-body.weather-open .chips{bottom:calc(var(--sb) + 386px)}
-body.weather-open .maplibregl-ctrl-top-right{top:auto!important;bottom:calc(var(--sb) + 430px)}
+body .chips{bottom:calc(var(--sb) + 312px)}
+body .maplibregl-ctrl-top-right{bottom:calc(var(--sb) + 366px)}
+body.weather-open .chips{bottom:calc(var(--sb) + 392px)}
+body.weather-open .maplibregl-ctrl-top-right{top:auto!important;bottom:calc(var(--sb) + 446px)}
 .weather-popup{max-width:270px;color:#1f2933;font-size:13px}
 .weather-popup p{margin-top:6px;white-space:pre-line;max-height:170px;overflow:auto}
 .weather-popup a{color:#1557b0}

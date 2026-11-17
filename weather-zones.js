@@ -51,7 +51,7 @@
         if(!v)continue;
         var cold=v[0]!==null&&v[0]<=3,cloud=v[1]===null?0:v[1],rain=v[2]===null?0:v[2];
         // Model-derived intensity bands match a weather map; no decorative blobs.
-        var color=[143,158,177],alpha=cloud>=85?.20:cloud>=65?.12:0;
+        var color=[143,158,177],alpha=cloud>=85?.12:cloud>=65?.07:0;
         if(cold){color=v[0]<=0?[112,133,222]:[160,181,238];alpha=v[0]<=-3?.43:v[0]<=0?.34:.24;}
         if(rain>=.15){
           var band=rain>=3?4:rain>=1.5?3:rain>=.7?2:rain>=.3?1:0;

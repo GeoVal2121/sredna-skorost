@@ -164,11 +164,11 @@
   }
   function style() {
     if (!map || !map.getLayer('route')) return;
-    var before=(map.getStyle().layers||[]).find(function(l){return l.id==='route-case';});
+    var before=(map.getStyle().layers||[]).find(function(l){return l.type==='line'&&l['source-layer']==='transportation';}) || (map.getStyle().layers||[]).find(function(l){return l.id==='route-case';});
     before=before?before.id:undefined;
     if (!map.getSource('weather-forecast')) {
       map.addSource('weather-forecast',{type:'raster',tiles:[tileURL(layer,selected)],tileSize:256,maxzoom:6,attribution:'© <a href="https://www.weatherapi.com/">WeatherAPI</a>'});
-      map.addLayer({id:'weather-forecast',type:'raster',source:'weather-forecast',paint:{'raster-opacity':0.6,'raster-fade-duration':0}},before);
+      map.addLayer({id:'weather-forecast',type:'raster',source:'weather-forecast',paint:{'raster-opacity':0.18,'raster-fade-duration':0}},before);
       map.addSource('weather-warnings',{type:'geojson',data:sourceData()});
       map.addLayer({id:'weather-warning-fill',type:'fill',source:'weather-warnings',paint:{'fill-color':['get','color'],'fill-opacity':0.13}},before);
       map.addLayer({id:'weather-warning-line',type:'line',source:'weather-warnings',paint:{'line-color':['get','color'],'line-width':2.5}},before);
