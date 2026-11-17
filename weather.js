@@ -112,7 +112,7 @@
   root.SSWeather=api;
   if (typeof document === 'undefined') return;
 
-  var $=function(id){return document.getElementById(id);}, map, enabled=false, layer='precip', selected=hour(Date.now());
+  var $=function(id){return document.getElementById(id);}, map, enabled=false, selected=hour(Date.now());
   var warningMarkers=[],alerts=[], fetched=0, updated=0, regions, busy=false, seq=0, popup, tileFailed=false, warningFailed=false, warningCount=0;
   function badge() {
     var failed=tileFailed||warningFailed||(root.SSWeatherZones&&SSWeatherZones.failed), b=$('weatherInfoBtn');
@@ -142,7 +142,7 @@
     if(enabled){var labeled=new Set();data.features.forEach(function(f){
       var p=f.properties,key=p.id+':'+p.area;if(labeled.has(key))return;labeled.add(key);
       var el=document.createElement('button');el.type='button';el.className='weather-warning-label';el.style.setProperty('--warning-color',p.color);
-      var icon=document.createElement('span');icon.textContent='⚠';el.append(icon,document.createTextNode(p.title+' · НИМХ'));
+      var icon=document.createElement('span');icon.textContent='⚠';el.append(icon);el.title=p.title+' · '+p.area+' · НИМХ';
       el.setAttribute('aria-label',p.title+' · '+p.area+' · НИМХ');var point=areaPoint(f.geometry);
       el.onclick=function(e){e.stopPropagation();popupFor(p,point);};
       warningMarkers.push(new maplibregl.Marker({element:el,anchor:'bottom'}).setLngLat(point).addTo(map));
@@ -180,7 +180,7 @@
     var before=(map.getStyle().layers||[]).find(function(l){return l['source-layer']==='building'||l.type==='fill-extrusion'||(l.type==='line'&&l['source-layer']==='transportation');}) || (map.getStyle().layers||[]).find(function(l){return l.id==='route-case';});
     before=before?before.id:undefined;
     if (!map.getSource('weather-forecast')) {
-      map.addSource('weather-forecast',{type:'raster',tiles:[tileURL(layer,selected)],tileSize:256,maxzoom:6,attribution:'© <a href="https://www.weatherapi.com/">WeatherAPI</a>'});
+      map.addSource('weather-forecast',{type:'raster',tiles:[tileURL('precip',selected)],tileSize:256,maxzoom:6,attribution:'© <a href="https://www.weatherapi.com/">WeatherAPI</a>'});
       map.addLayer({id:'weather-forecast',type:'raster',source:'weather-forecast',paint:{'raster-opacity':0.18,'raster-fade-duration':0}},before);
       map.addSource('weather-warnings',{type:'geojson',data:sourceData()});
       map.addLayer({id:'weather-warning-fill',type:'fill',source:'weather-warnings',paint:{'fill-color':['get','color'],'fill-opacity':0.13}},before);
@@ -189,7 +189,7 @@
     ['weather-forecast','weather-warning-fill','weather-warning-line'].forEach(function(id){map.setLayoutProperty(id,'visibility',enabled?'visible':'none');});
     labelContrast();
     updateWarnings();
-    if(root.SSWeatherZones)SSWeatherZones.show(enabled&&layer==='precip',selected);
+    if(root.SSWeatherZones)SSWeatherZones.show(enabled,selected);
     // A theme reload can recreate the canvas before the warning layers exist.
     if(map.getLayer('weather-zones'))map.moveLayer('weather-zones','weather-warning-fill');
   }
@@ -198,11 +198,10 @@
     $('weatherTime').textContent='Прогноза: '+label(selected);
     $('weatherHour').setAttribute('aria-valuetext',label(selected)+' българско време');
     $('weatherStatus').textContent='Зареждане на прогнозата…';
-    $('weatherLegend').src='https://weathermaps.weatherapi.com/img/legend_'+(layer==='precip'?'precip':'wind_ms')+'_gradient.png';
-    $('weatherLegend').alt=layer==='precip'?'Валежи — милиметри на час':'Вятър — метри в секунда';
-    $('weatherUnits').textContent=layer==='precip'?'Валежи (мм/ч)':'Вятър (м/с)';
-    $('weatherRain').setAttribute('aria-pressed',String(layer==='precip'));$('weatherWind').setAttribute('aria-pressed',String(layer==='wind'));
-    if(map && map.getSource('weather-forecast')) map.getSource('weather-forecast').setTiles([tileURL(layer,selected)]);
+    $('weatherLegend').src='https://weathermaps.weatherapi.com/img/legend_precip_gradient.png';
+    $('weatherLegend').alt='Валежи — милиметри на час';
+    $('weatherUnits').textContent='Валежи (мм/ч)';
+    if(map && map.getSource('weather-forecast')) map.getSource('weather-forecast').setTiles([tileURL('precip',selected)]);
     style();if(popup){popup.remove();popup=null;}
   }
   async function refreshWarnings() {
@@ -225,7 +224,7 @@
     } finally {busy=false;if(generation!==seq && enabled)refreshWarnings();}
   }
   function toggle() {
-    enabled=!enabled;seq++;$('weatherPanel').hidden=!enabled;$('weatherSwitches').hidden=!enabled;$('weatherToggle').setAttribute('aria-pressed',String(enabled));
+    enabled=!enabled;seq++;$('weatherPanel').hidden=!enabled;$('weatherToggle').setAttribute('aria-pressed',String(enabled));
     document.body.classList.toggle('weather-open',enabled);
     if(enabled){selected=hour(Date.now());$('weatherHour').value=0;forecast();refreshWarnings();}else{style();if(popup)popup.remove();}
   }
@@ -243,13 +242,12 @@
     });
     $('weatherToggle').onclick=toggle;$('weatherClose').onclick=toggle;
     $('weatherInfoBtn').onclick=function(){$('weatherInfo').showModal();};
-    $('weatherRain').onclick=function(){layer='precip';forecast();};$('weatherWind').onclick=function(){layer='wind';forecast();};
-    $('weatherHour').oninput=function(){selected=hour(Date.now())+Number(this.value)*3600000;$('weatherTime').textContent='Прогноза: '+label(selected);};
+    $('weatherHour').oninput=function(){selected=hour(Date.now())+Number(this.value)*3600000;$('weatherTime').textContent='Прогноза: '+label(selected);if(root.SSWeatherZones)SSWeatherZones.preview(selected);};
     $('weatherHour').onchange=forecast;
     $('weatherNow').onclick=function(){selected=hour(Date.now());$('weatherHour').value=0;forecast();refreshWarnings();};
     $('weatherLegend').onerror=function(){this.hidden=true;$('weatherStatus').textContent='Легендата не е достъпна.';};
     $('weatherLegend').onload=function(){this.hidden=false;};
     document.addEventListener('visibilitychange',function(){if(enabled&&!document.hidden)refreshWarnings();});
-    setInterval(function(){if(enabled&&!document.hidden){updateWarnings();refreshWarnings();if(root.SSWeatherZones)SSWeatherZones.show(layer==='precip',selected);}},60000);
+    setInterval(function(){if(enabled&&!document.hidden){updateWarnings();refreshWarnings();if(root.SSWeatherZones)SSWeatherZones.show(enabled,selected);}},60000);
   };
 })(typeof window !== 'undefined' ? window : globalThis);
