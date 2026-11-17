@@ -12,7 +12,7 @@
   if(typeof document==='undefined')return;
   var map,data,pending,canvas=document.createElement('canvas'),markers=[],active=false,time=0;
   canvas.width=560;canvas.height=360;
-  var ctx=canvas.getContext('2d');
+  var ctx=canvas.getContext('2d'),drawnData=null,drawnTime=null,drawnActive=null;
   function merc(lat){return Math.log(Math.tan(Math.PI/4+lat*Math.PI/360));}
   function clearMarkers(){markers.forEach(function(m){m.remove();});markers=[];}
   function labels(){
@@ -42,6 +42,8 @@
     });
   }
   function render(){
+    if(drawnData===data&&drawnTime===time&&drawnActive===active&&(!active||map.getSource('weather-zones'))){labels();return;}
+    drawnData=data;drawnTime=time;drawnActive=active;
     clearMarkers();ctx.clearRect(0,0,canvas.width,canvas.height);
     var h=data?data.times.indexOf(time/1000):-1;
     if(active&&h>=0){
