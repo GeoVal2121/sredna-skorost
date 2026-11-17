@@ -12,6 +12,7 @@
 <link rel="icon" href="icon-gantry-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icon-gantry-180.png">
 <link rel="stylesheet" href="lib/maplibre-gl.css?v=ab1e70d59ec4">
+<link rel="stylesheet" href="weather.css?v=2026.11.17-2">
 <style>
 :root{--bg:#eef1f4;--panel:#fffffff2;--line:#d8dee6;--tx:#1f2933;--mut:#5f6b7a;--ok:#188038;--warn:#e37400;--bad:#d93025;--acc:#1a73e8;
   --st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);--sl:env(safe-area-inset-left,0px);--sr:env(safe-area-inset-right,0px)}
@@ -255,6 +256,7 @@ html.dark .road-badge{background:#223e64;color:#d6e7ff;border-color:#5578a6}
     <p class="mut" id="aNote" style="margin-top:6px;font-size:12px"></p>
   </div>
   <div class="card result" id="res" hidden></div>
+  <div class="weather-switches" id="weatherSwitches" hidden><button id="weatherRain" type="button" aria-pressed="true">Обстановка</button><button id="weatherWind" type="button" aria-pressed="false">Вятър</button></div>
 </div>
 
 <div class="chips"><span class="chip" id="gps">GPS: изкл.</span><span class="chip" id="osm">…</span></div>
@@ -262,6 +264,7 @@ html.dark .road-badge{background:#223e64;color:#d6e7ff;border-color:#5578a6}
 <div class="spdw"><div class="spd" id="spdBox"><b id="spd">–</b><span>км/ч</span></div><div class="limit rlim" id="roadLim" hidden></div></div>
 
 <div class="side">
+  <button id="weatherToggle" type="button" aria-label="Време и предупреждения" title="Време и предупреждения" aria-pressed="false" aria-controls="weatherPanel">☁</button>
   <button id="center" aria-label="Центрирай">◎</button>
   <button id="themeToggle" type="button" aria-label="Смяна на темата">🌙</button>
   <button id="shareBtn" type="button" aria-label="Сподели приложението" title="Сподели приложението"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m8 10 8-5M8 14l8 5"/><circle cx="5" cy="12" r="3"/><circle cx="19" cy="4" r="3"/><circle cx="19" cy="20" r="3"/></svg></button>
@@ -272,6 +275,21 @@ html.dark .road-badge{background:#223e64;color:#d6e7ff;border-color:#5578a6}
   <button id="go">Старт</button>
   <button id="reportBtn" aria-haspopup="dialog">Сигнализирай</button>
 </div>
+
+<section class="card" id="weatherPanel" hidden aria-label="Време върху картата">
+  <div class="weather-time"><strong id="weatherTime"></strong><div><button id="weatherNow" type="button">Сега</button><button id="weatherInfoBtn" type="button" aria-label="Подробности за времето и предупрежденията">ⓘ</button><button id="weatherClose" type="button" aria-label="Скрий времето">×</button></div></div>
+  <input id="weatherHour" type="range" min="0" max="48" step="1" value="0" aria-label="Час на прогнозата — до 48 часа напред">
+  <div class="weather-credit"><a href="https://www.weatherapi.com/" target="_blank" rel="noopener">WeatherAPI</a> · <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a> · <a href="https://weather.bg/obshtini/" target="_blank" rel="noopener">НИМХ</a> / <a href="https://meteoalarm.org/" target="_blank" rel="noopener">MeteoAlarm</a></div>
+</section>
+<dialog id="weatherInfo" aria-labelledby="weatherInfoTitle">
+  <h3 id="weatherInfoTitle">Време и предупреждения</h3>
+  <div class="weather-legend"><span id="weatherUnits">Валежи (мм/ч)</span><span>· Българско време</span></div>
+  <img id="weatherLegend" alt="Легенда за валежите">
+  <p id="weatherZoneStatus" role="status"></p><p id="weatherStatus" role="status"></p><p id="warningStatus" role="status"></p>
+  <details id="weatherDetails" hidden><summary>Предупреждения по райони</summary><ul id="weatherList"></ul></details>
+  <p class="weather-credit">Предупреждения: НИМХ чрез EUMETNET–MeteoAlarm.<br>© EuroGeographics за административните граници</p>
+  <form method="dialog"><button>Затвори</button></form>
+</dialog>
 
 <div class="card prev" id="prev" hidden>
   <div id="prevBody"></div>
@@ -353,19 +371,21 @@ html.dark .road-badge{background:#223e64;color:#d6e7ff;border-color:#5578a6}
 <div class="toast" id="toast"></div>
 
 </div>
-<script defer src="install.js?v=2026.11.15-17"></script>
-<script defer src="viewport.js?v=2026.11.15-17"></script>
-<script defer src="towns.js?v=2026.11.15-17"></script>
-<script defer src="data.js?v=2026.11.15-17"></script>
-<script defer src="roadlim.js?v=2026.11.15-17"></script>
-<script defer src="cameras.js?v=2026.11.15-17"></script>
-<script defer src="geometry.js?v=2026.11.15-17"></script>
-<script defer src="direction-geometry.js?v=2026.11.15-17"></script>
-<script defer src="core.js?v=2026.11.15-17"></script>
-<script defer src="app.js?v=2026.11.15-17"></script>
+<script defer src="install.js?v=2026.11.17-1"></script>
+<script defer src="viewport.js?v=2026.11.17-1"></script>
+<script defer src="towns.js?v=2026.11.17-1"></script>
+<script defer src="data.js?v=2026.11.17-1"></script>
+<script defer src="roadlim.js?v=2026.11.17-1"></script>
+<script defer src="cameras.js?v=2026.11.17-1"></script>
+<script defer src="geometry.js?v=2026.11.17-1"></script>
+<script defer src="direction-geometry.js?v=2026.11.17-1"></script>
+<script defer src="core.js?v=2026.11.17-1"></script>
+<script defer src="app.js?v=2026.11.17-1"></script>
 <script defer src="lib/maplibre-gl.js?v=45a9b07a9189"></script>
-<script defer src="map.js?v=2026.11.15-17"></script>
-<script defer src="navcore.js?v=2026.11.15-17"></script>
-<script defer src="nav.js?v=2026.11.15-17"></script>
+<script defer src="weather-zones.js?v=2026.11.17-2"></script>
+<script defer src="weather.js?v=2026.11.17-2"></script>
+<script defer src="map.js?v=2026.11.17-1"></script>
+<script defer src="navcore.js?v=2026.11.17-1"></script>
+<script defer src="nav.js?v=2026.11.17-1"></script>
 </body>
 </html>

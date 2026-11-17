@@ -498,4 +498,5 @@
   window.SSMap = { onFix: onFix, refresh: refresh, recenter: function () { setFollow(true); recenter(); }, resetTrack: resetTrack,
     setRoute: setRoute, setDest: setDest, center: center, setTheme: setTheme, roadAt: roadAt, follow: function () { setFollow(true); recenter(); } };
   init();
+  if (window.SSWeather && map) SSWeather.mount(map);
 })();
