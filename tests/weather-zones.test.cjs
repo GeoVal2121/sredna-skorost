@@ -22,7 +22,7 @@ test('fixed forecast endpoint validates upstream, hours and caches complete grid
   };
   try{
     assert.equal((await handler(req)).status,502);bad=false;
-    const r=await handler(req);assert.equal(r.status,200);const d=await r.json();assert.equal(d.cells.length,288);assert.equal(d.times.length,60);assert.equal(d.windComponents,'towards-east-north-kmh');assert(Math.abs(windAt(d,0,24,42).speed-25)<1e-8);assert(Math.abs(windAt(d,0,24,42).towards-45)<1e-8);
+    const r=await handler(req);assert.equal(r.status,200);const d=await r.json();assert.equal(d.cells.length,288);assert.equal(d.times.length,60);assert.equal(d.windComponents,'towards-east-north-kmh');assert(Math.abs(windAt(d,0,24,42).speed-25)<.008);assert(Math.abs(windAt(d,0,24,42).towards-45)<1e-8);
     const n=calls;await handler(req);assert.equal(calls,n,'warm cache avoids repeated multi-location requests');
   }finally{global.fetch=original;}
 });
@@ -54,4 +54,15 @@ test('regional fallback respects polygon holes and unknown condition',()=>{
  assert(!contains({type:'MultiPolygon',coordinates:[[ring]]},[5,5]));
  const d={grid:{west:22,south:41,cols:2,rows:2,step:1},cells:Array.from({length:4},()=>[[null],[null],[null],[null],[null],[null],[null]])};
  assert.equal(condition(d,0,[22.5,41.5]).text,'Няма данни за облачността');
+});
+
+test('allocation-free interpolation matches the original numeric formula and reuses output',()=>{
+ const d={grid:{west:22,south:41,cols:2,rows:2,step:1},cells:[[-8,70,.1],[12,100,3],[5,60,.6],[-2,90,2]].map(c=>c.map(n=>[n]))};
+ const out=[];
+ for(let y=0;y<=10;y++)for(let x=0;x<=10;x++){
+  const dx=x/10,dy=y/10,w=[(1-dx)*(1-dy),dx*(1-dy),(1-dx)*dy,dx*dy];
+  assert.equal(sample(d,0,22+dx,41+dy,[0,1,2],out),out);
+  out.forEach((n,f)=>assert(Math.abs(n-d.cells.reduce((v,c,i)=>v+c[f][0]*w[i],0))<1e-10));
+ }
+ d.cells[0][1][0]=null;assert.equal(sample(d,0,22.5,41.5,[0,1,2],out)[1],null);
 });

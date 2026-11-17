@@ -1,12 +1,19 @@
 (function(root){
   'use strict';
   // Bilinear forecast fields; null remains unknown, never dry/clear/zero degrees.
-  function sample(data, hour, lon, lat, fields) {
+  var defaultFields=[0,1,2,3];
+  function sample(data, hour, lon, lat, fields, out) {
     var g=data.grid,x=(lon-g.west)/g.step,y=(lat-g.south)/g.step;
     if(x<0||y<0||x>g.cols-1||y>g.rows-1)return null;
     var a=Math.min(Math.floor(x),g.cols-2),b=Math.min(Math.floor(y),g.rows-2),dx=x-a,dy=y-b;
-    var ids=[b*g.cols+a,b*g.cols+a+1,(b+1)*g.cols+a,(b+1)*g.cols+a+1],weights=[(1-dx)*(1-dy),dx*(1-dy),(1-dx)*dy,dx*dy];
-    return (fields||[0,1,2,3]).map(function(f){var v=ids.map(function(i){return data.cells[i][f][hour];});return v.some(function(n){return n===null;})?null:v.reduce(function(s,n,i){return s+n*weights[i];},0);});
+    var i=b*g.cols+a,c0=data.cells[i],c1=data.cells[i+1],c2=data.cells[i+g.cols],c3=data.cells[i+g.cols+1];
+    var w0=(1-dx)*(1-dy),w1=dx*(1-dy),w2=(1-dx)*dy,w3=dx*dy;
+    fields=fields||defaultFields;out=out||[];
+    for(var f=0;f<fields.length;f++){
+      var n=fields[f],v0=c0[n][hour],v1=c1[n][hour],v2=c2[n][hour],v3=c3[n][hour];
+      out[f]=v0===null||v1===null||v2===null||v3===null?null:v0*w0+v1*w1+v2*w2+v3*w3;
+    }
+    return out;
   }
   function windAt(data,h,lon,lat) {
     if(data.windComponents!=='towards-east-north-kmh')return null;
@@ -37,7 +44,7 @@
   if(typeof document==='undefined')return;
   var map,data,pending,canvas=document.createElement('canvas'),active=false,time=0;
   canvas.width=560;canvas.height=360;
-  var ctx=canvas.getContext('2d'),drawnData=null,drawnTime=null,drawnActive=null;
+  var ctx=canvas.getContext('2d'),drawnData=null,drawnTime=null;
   function merc(lat){return Math.log(Math.tan(Math.PI/4+lat*Math.PI/360));}
   var $=function(id){return document.getElementById(id);};
   var markers=[],regions=[],regionsPending,popup;
@@ -95,34 +102,42 @@
     });
   }
   function render(){
-    if(drawnData===data&&drawnTime===time&&drawnActive===active&&(!active||map.getSource('weather-zones'))){zoneMarkers();return;}
-    drawnData=data;drawnTime=time;drawnActive=active;
-    zoneMarkers();ctx.clearRect(0,0,canvas.width,canvas.height);
+    zoneMarkers();
     var h=data?data.times.indexOf(time/1000):-1;
-    if(active&&h>=0){
-      var g=data.grid,east=g.west+(g.cols-1)*g.step,north=g.south+(g.rows-1)*g.step,mn=merc(north),ms=merc(g.south),im=ctx.createImageData(canvas.width,canvas.height);
-      for(var y=0;y<canvas.height;y++)for(var x=0;x<canvas.width;x++){
-        var lon=g.west+x/(canvas.width-1)*(east-g.west),lat=(2*Math.atan(Math.exp(mn+y/(canvas.height-1)*(ms-mn)))-Math.PI/2)*180/Math.PI,v=sample(data,h,lon,lat);
+    if(!active||h<0){
+      if(map.getLayer('weather-zones'))map.setLayoutProperty('weather-zones','visibility','none');
+      if(active&&data)status('Няма данни за зоните за този час.',true);
+      return;
+    }
+    var g=data.grid,east=g.west+(g.cols-1)*g.step,north=g.south+(g.rows-1)*g.step,changed=drawnData!==data||drawnTime!==time;
+    if(changed){
+      var mn=merc(north),ms=merc(g.south),im=ctx.createImageData(canvas.width,canvas.height),values=[],paintFields=[0,1,2];
+      var cloudColor=[143,158,177],iceColor=[112,133,222],coldColor=[160,181,238],rainColors=[[90,224,205],[63,196,222],[40,155,235],[35,112,232],[49,73,210]],rainAlpha=[.27,.34,.43,.52,.60];
+      for(var y=0;y<canvas.height;y++){
+        var lat=(2*Math.atan(Math.exp(mn+y/(canvas.height-1)*(ms-mn)))-Math.PI/2)*180/Math.PI;
+        for(var x=0;x<canvas.width;x++){
+        var lon=g.west+x/(canvas.width-1)*(east-g.west),v=sample(data,h,lon,lat,paintFields,values);
         if(!v)continue;
         var cold=v[0]!==null&&v[0]<=3,cloud=v[1]===null?0:v[1],rain=v[2]===null?0:v[2];
         // Model-derived intensity bands match a weather map; no decorative blobs.
-        var color=[143,158,177],alpha=cloud>=85?.12:cloud>=65?.07:0;
-        if(cold){color=v[0]<=0?[112,133,222]:[160,181,238];alpha=v[0]<=-3?.43:v[0]<=0?.34:.24;}
+        var color=cloudColor,alpha=cloud>=85?.12:cloud>=65?.07:0;
+        if(cold){color=v[0]<=0?iceColor:coldColor;alpha=v[0]<=-3?.43:v[0]<=0?.34:.24;}
         if(rain>=.15){
           var band=rain>=3?4:rain>=1.5?3:rain>=.7?2:rain>=.3?1:0;
-          color=[[90,224,205],[63,196,222],[40,155,235],[35,112,232],[49,73,210]][band];alpha=[.27,.34,.43,.52,.60][band];
+          color=rainColors[band];alpha=rainAlpha[band];
         }
         var edge=Math.min(1,x/14,y/14,(canvas.width-1-x)/14,(canvas.height-1-y)/14),i=(y*canvas.width+x)*4;
         im.data[i]=color[0];im.data[i+1]=color[1];im.data[i+2]=color[2];im.data[i+3]=Math.round(255*alpha*edge);
       }
-      ctx.putImageData(im,0,0);
+      }
+      ctx.putImageData(im,0,0);drawnData=data;drawnTime=time;
+    }
       if(!map.getSource('weather-zones')){
+        changed=true;
         map.addSource('weather-zones',{type:'canvas',canvas:canvas,animate:false,coordinates:[[g.west,north],[east,north],[east,g.south],[g.west,g.south]],attribution:'© <a href="https://open-meteo.com/">Open-Meteo</a>'});
         map.addLayer({id:'weather-zones',type:'raster',source:'weather-zones',paint:{'raster-fade-duration':0}},map.getLayer('weather-warning-fill')?'weather-warning-fill':'route');
       }
-
-    }
-    var source=map.getSource('weather-zones');if(source){source.play();map.once('render',function(){if(map.getSource('weather-zones')===source)source.pause();});}
+    var source=map.getSource('weather-zones');if(source&&changed){source.play();map.once('render',function(){if(map.getSource('weather-zones')===source)source.pause();});}
     if(map.getLayer('weather-zones'))map.setLayoutProperty('weather-zones','visibility',active&&h>=0?'visible':'none');
     map.triggerRepaint();
     if(active&&data)status(h>=0?'Зони: облачност, дъжд и студ ≤ 3°C · Open-Meteo. Приблизителни граници (~25 км), не предупреждения за поледица.':'Няма данни за зоните за този час.',h<0);
@@ -137,7 +152,7 @@
     if(active&&!regions.length&&!regionsPending)regionsPending=fetch('weather-regions.geojson').then(function(r){if(!r.ok)throw new Error('Regions unavailable');return r.json();}).then(function(d){regions=d.features;zoneMarkers();}).catch(function(){}).finally(function(){regionsPending=null;});
     render();if(!active||data||pending)return;
     status('Зареждане на облачност и температурни зони…',false);
-    pending=fetch('/.netlify/functions/weather-zones?v=3',{signal:AbortSignal.timeout(20000)}).then(function(r){if(!r.ok)throw new Error('Unavailable');return r.json();}).then(function(d){
+    pending=fetch('/.netlify/functions/weather-zones?v=4',{signal:AbortSignal.timeout(20000)}).then(function(r){if(!r.ok)throw new Error('Unavailable');return r.json();}).then(function(d){
       if(!d.grid||d.grid.cols!==24||d.grid.rows!==12||!Array.isArray(d.cells)||d.cells.length!==288||!Array.isArray(d.times)||!Number.isFinite(d.generated)||Date.now()-d.generated>7200000||d.windComponents!=='towards-east-north-kmh'||d.cells.some(function(c){return !Array.isArray(c)||c.length!==7||c.some(function(a){return !Array.isArray(a)||a.length!==d.times.length||a.some(function(v){return v!==null&&!Number.isFinite(v);});});}))throw new Error('Invalid grid');
       data=d;api.failed=false;render();
     }).catch(function(){data=null;render();status('Облачността и температурните зони са недостъпни.',true);}).finally(function(){pending=null;});

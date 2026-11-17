@@ -4,7 +4,7 @@ const fields = ['temperature_2m','cloud_cover','precipitation','snowfall','wind_
 let cached;
 export default async function handler(request) {
   if (request.method !== 'GET') return new Response('Method not allowed',{status:405});
-  if (new URL(request.url).search && new URL(request.url).search !== '?v=3') return new Response('No parameters supported',{status:400});
+  if (new URL(request.url).search && !['?v=3','?v=4'].includes(new URL(request.url).search)) return new Response('No parameters supported',{status:400});
   try {
     if (!cached || Date.now()-cached.generated>3600000) {
       const points=Array.from({length:grid.cols*grid.rows},(_,i)=>[
@@ -30,10 +30,11 @@ export default async function handler(request) {
           if(f==='weather_code'&&a.some(v=>v!==null&&![0,1,2,3,45,48,51,53,55,56,57,61,63,65,66,67,71,73,75,77,80,81,82,85,86,95,96,99].includes(v))) throw new Error('Invalid weather code');
           return a;
         });
+        // Round components to 0.01 km/h (vector error <0.008 km/h), avoiding long JSON decimals.
         // Interpolate vectors, not compass angles (359° and 1° are neighbours).
         const speed=values[4],direction=values[5];
-        values[4]=speed.map((v,i)=>v===null||direction[i]===null?null:-v*Math.sin(direction[i]*Math.PI/180));
-        values[5]=speed.map((v,i)=>v===null||direction[i]===null?null:-v*Math.cos(direction[i]*Math.PI/180));
+        values[4]=speed.map((v,i)=>v===null||direction[i]===null?null:Math.round(-v*Math.sin(direction[i]*Math.PI/180)*100)/100);
+        values[5]=speed.map((v,i)=>v===null||direction[i]===null?null:Math.round(-v*Math.cos(direction[i]*Math.PI/180)*100)/100);
         return values;
       });
       cached={grid,times,cells,windComponents:'towards-east-north-kmh',generated:Date.now()};
