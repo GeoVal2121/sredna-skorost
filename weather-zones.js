@@ -40,32 +40,16 @@
     function ring(r){var inside=false;for(var i=0,j=r.length-1;i<r.length;j=i++)if((r[i][1]>p[1])!==(r[j][1]>p[1])&&p[0]<(r[j][0]-r[i][0])*(p[1]-r[i][1])/(r[j][1]-r[i][1])+r[i][0])inside=!inside;return inside;}
     return (geometry.type==='Polygon'?[geometry.coordinates]:geometry.coordinates).some(function(poly){return ring(poly[0])&&!poly.slice(1).some(ring);});
   }
-  // Merge neighbouring categorical model cells; shared edges never become visible borders.
-  function riskZones(d,h){
-    var g=d.grid,features=[];
-    ['fog','ice'].forEach(function(kind){
-      var codes=kind==='fog'?[45,48]:[48,56,57,66,67],remaining=new Set();
-      d.cells.forEach(function(c,i){if(c[6]&&codes.includes(c[6][h]))remaining.add(i);});
-      while(remaining.size){
-        var first=remaining.values().next().value,queue=[first],edges=new Map();remaining.delete(first);
-        for(var q=0;q<queue.length;q++){
-          var i=queue[q],x=i%g.cols,y=Math.floor(i/g.cols);
-          [[x-1,y],[x+1,y],[x,y-1],[x,y+1]].forEach(function(p){var n=p[1]*g.cols+p[0];if(p[0]>=0&&p[0]<g.cols&&p[1]>=0&&p[1]<g.rows&&remaining.delete(n))queue.push(n);});
-          var corners=[[x,y],[x+1,y],[x+1,y+1],[x,y+1]];
-          corners.forEach(function(a,j){var b=corners[(j+1)%4],key=a.join(',')+':'+b.join(','),reverse=b.join(',')+':'+a.join(',');if(!edges.delete(reverse))edges.set(key,[a,b]);});
-        }
-        var rings=[];
-        while(edges.size){
-          var edge=edges.values().next().value,ring=[edge[0]],start=edge[0].join(','),current=edge;
-          do{edges.delete(current[0].join(',')+':'+current[1].join(','));ring.push(current[1]);if(current[1].join(',')===start)break;var end=current[1].join(',');current=Array.from(edges.values()).find(function(e){return e[0].join(',')===end;});}while(current);
-          if(ring.length>=4)rings.push(ring.map(function(p){return [g.west+Math.max(0,Math.min(g.cols-1,p[0]-.5))*g.step,g.south+Math.max(0,Math.min(g.rows-1,p[1]-.5))*g.step];}));
-        }
-        function area(r){return r.reduce(function(v,p,i){var n=r[(i+1)%r.length];return v+p[0]*n[1]-n[0]*p[1];},0);}
-        rings.sort(function(a,b){return Math.abs(area(b))-Math.abs(area(a));});
-        // A single corner cut reflects the coarse (~25 km) model boundary without a staircase outline.
-        rings=rings.map(function(r){var smooth=[];for(var i=0;i<r.length-1;i++){var a=r[i],b=r[i+1];smooth.push([a[0]*.85+b[0]*.15,a[1]*.85+b[1]*.15],[a[0]*.15+b[0]*.85,a[1]*.15+b[1]*.85]);}smooth.push(smooth[0]);return smooth;});
-        if(rings.length)features.push({type:'Feature',properties:{kind:kind},geometry:{type:'Polygon',coordinates:rings}});
-      }
+  // Outline municipalities with a forecast signal in any intersecting model cell.
+  // The boundary is administrative, not the physical edge of fog or road ice.
+  function riskZones(d,h,municipalities){
+    var features=[];
+    if(!municipalities||!['west','south','step','cols','rows'].every(function(k){return municipalities.grid[k]===d.grid[k];}))return {type:'FeatureCollection',features:features};
+    municipalities.features.forEach(function(f){
+      ['fog','ice'].forEach(function(kind){
+        var codes=kind==='fog'?[45,48]:[48,56,57,66,67];
+        if(f.properties.cells.some(function(i){var c=d.cells[i];return c&&c[6]&&codes.includes(c[6][h]);}))features.push({type:'Feature',properties:{kind:kind,municipality:f.properties.name,bbox:f.properties.bbox},geometry:f.geometry});
+      });
     });
     return {type:'FeatureCollection',features:features};
   }
@@ -76,7 +60,7 @@
   var ctx=canvas.getContext('2d'),drawnData=null,drawnTime=null,drawnMode=null;
   function merc(lat){return Math.log(Math.tan(Math.PI/4+lat*Math.PI/360));}
   var $=function(id){return document.getElementById(id);};
-  var markers=[],regions=[],regionsPending,popup;
+  var markers=[],regions=[],regionsPending,popup,municipalities,municipalitiesPending,municipalityFailed=false;
   function icon(name){var img=document.createElement('img');img.src='lib/weather-icons/'+name+'.svg';img.alt='';return img;}
   function closeDetails(){if(popup){popup.remove();popup=null;}}
   function details(place,h,button){
@@ -136,23 +120,30 @@
       occupied.push(r);markers.push(marker);seen.add(place.name);
     });
   }
-  var riskMarkers=[],riskData,riskTime,riskFeatures,windCanvas,windAnimation;
+  var riskMarkers=[],riskData,riskTime,riskFeatures,windCanvas,windAnimation,riskRenderedSource,riskRenderedFeatures,riskRenderedView;
   function drawRisks(h){
-    riskMarkers.forEach(function(m){m.remove();});riskMarkers=[];if(!map.getStyle())return;
-    if(active&&h>=0&&(riskData!==data||riskTime!==time)){riskFeatures=riskZones(data,h);riskData=data;riskTime=time;}
+    if(!map.getStyle())return;
+    if(active&&h>=0&&(riskData!==data||riskTime!==time)){riskFeatures=riskZones(data,h,municipalities);riskData=data;riskTime=time;}
     var fc=active&&h>=0?riskFeatures:{type:'FeatureCollection',features:[]};
+    var center=map.getCenter(),box=map.getContainer().getBoundingClientRect(),view=[center.lng,center.lat,map.getZoom(),map.getPitch(),map.getBearing(),box.width,box.height].join(',');
+    if(active&&h>=0&&riskRenderedFeatures===fc&&riskRenderedView===view&&riskRenderedSource===map.getSource('weather-risks'))return;
+    riskMarkers.forEach(function(m){m.remove();});riskMarkers=[];
     var before=map.getStyle().layers.find(function(l){return l['source-layer']==='building'||l.type==='fill-extrusion'||(l.type==='line'&&l['source-layer']==='transportation');});
     if(!map.getSource('weather-risks')&&active&&h>=0){
-      map.addSource('weather-risks',{type:'geojson',data:fc});
-      map.addLayer({id:'weather-risk-fill',type:'fill',source:'weather-risks',paint:{'fill-color':['match',['get','kind'],'ice','#edb849','#9abace'],'fill-opacity':.10}},before?before.id:'route');
-      ['fog','ice'].forEach(function(kind){map.addLayer({id:'weather-risk-'+kind,type:'line',source:'weather-risks',filter:['==','kind',kind],paint:Object.assign({'line-color':kind==='ice'?'#e5aa39':'#8facbd','line-width':1.2},kind==='ice'?{'line-dasharray':[4,2]}:{})},before?before.id:'route');});
-    }else if(map.getSource('weather-risks'))map.getSource('weather-risks').setData(fc);
-    if(map.getLayer('weather-risk-fog'))map.setPaintProperty('weather-risk-fog','line-color',document.documentElement.classList.contains('dark')?'#a5ccdf':'#7698ad');
+      map.addSource('weather-risks',{type:'geojson',data:fc,attribution:'Municipal boundaries: <a href="https://www.geoboundaries.org/">geoBoundaries</a> / Wikimedia (2019)'});
+      map.addLayer({id:'weather-risk-fill',type:'fill',source:'weather-risks',paint:{'fill-color':['match',['get','kind'],'ice','#9edafa','#fff1a3'],'fill-opacity':.10}},before?before.id:'route');
+      ['fog','ice'].forEach(function(kind){map.addLayer({id:'weather-risk-'+kind,type:'line',source:'weather-risks',filter:['==','kind',kind],paint:{'line-color':kind==='ice'?'#168ed0':'#e5b000','line-width':1.5}},before?before.id:'route');});
+    }else if(map.getSource('weather-risks')&&riskRenderedFeatures!==fc)map.getSource('weather-risks').setData(fc);
+    riskRenderedSource=map.getSource('weather-risks');riskRenderedFeatures=fc;riskRenderedView=view;
     (fc.features||[]).forEach(function(f){
+      var bounds=map.getBounds(),b=f.properties.bbox;
+      if(b&&(b[2]<bounds.getWest()||b[0]>bounds.getEast()||b[3]<bounds.getSouth()||b[1]>bounds.getNorth()))return;
+      if(b){var corners=[[b[0],b[1]],[b[2],b[1]],[b[2],b[3]],[b[0],b[3]]].map(function(p){return map.project(p);});if(Math.max.apply(null,corners.map(function(p){return p.x;}))-Math.min.apply(null,corners.map(function(p){return p.x;}))<65||Math.max.apply(null,corners.map(function(p){return p.y;}))-Math.min.apply(null,corners.map(function(p){return p.y;}))<24)return;}
+
       var box=map.getContainer().getBoundingClientRect(),candidates=[SSWeather.areaPoint(f.geometry)],obstacles=Array.from(document.querySelectorAll('.top,.chips,.side,.spdw,.maplibregl-ctrl,#weatherPanel,#bottomBar,.weather-warning-label')).map(function(e){return e.getBoundingClientRect();}).filter(function(r){return r.width&&r.height;});
       [.45,.55,.35,.65,.75,.25].forEach(function(y){[.45,.3,.6,.2,.7].forEach(function(x){var ll=map.unproject([box.width*x,box.height*y]);candidates.push([ll.lng,ll.lat]);});});
-      var el=document.createElement('div'),ice=f.properties.kind==='ice';el.className='weather-risk-label '+f.properties.kind;
-      el.append(icon(ice?'snowflake':'mist'));var text=document.createElement('span');text.textContent=ice?'Риск от заледяване':'Мъгла';el.append(text);
+      var el=document.createElement('div'),ice=f.properties.kind==='ice';el.className='weather-risk-label '+f.properties.kind;el.setAttribute('aria-label',(ice?'Прогнозен риск от заледяване':'Прогнозна мъгла')+' в части от общината');
+      el.append(icon(ice?'snowflake':'mist'));var text=document.createElement('span');text.textContent=ice?'ЗАЛЕДЯВАНЕ':'МЪГЛА';el.append(text);
       if(ice){var small=document.createElement('small');small.textContent='Прогнозен риск';text.append(small);}
       var marker=new maplibregl.Marker({element:el,anchor:'center'}).setLngLat(candidates[0]).addTo(map),fits=false;
       for(var n=0;n<candidates.length;n++){
@@ -228,16 +219,20 @@
     var source=map.getSource('weather-zones');if(source&&changed){source.play();map.once('render',function(){if(map.getSource('weather-zones')===source)source.pause();});}
     if(map.getLayer('weather-zones'))map.setLayoutProperty('weather-zones','visibility',active&&h>=0?'visible':'none');
     map.triggerRepaint();
-    if(active&&data)status(h>=0?'Open-Meteo · приблизителни прогнозни зони (~25 км). Рискът от заледяване е моделна оценка, не наблюдавана поледица.':'Няма данни за зоните за този час.',h<0);
+    if(active&&data)status(h>=0?'Open-Meteo · приблизителни прогнозни зони (~25 км). Общинският контур означава прогнозен риск в части от общината, не наблюдение на пътя.':'Няма данни за зоните за този час.',h<0);
   }
-  function status(message,failed){document.getElementById('weatherZoneStatus').textContent=message;api.failed=failed;if(api.onstatus)api.onstatus();}
-  api.mount=function(m){map=m;map.on('moveend',function(){drawRisks(data?data.times.indexOf(time/1000):-1);zoneMarkers();windFrame();});map.on('movestart',function(){stopWind();});map.on('resize',function(){zoneMarkers();windFrame();});map.on('style.load',function(){if(active)render();});
+  function status(message,failed){document.getElementById('weatherZoneStatus').textContent=message+(municipalityFailed?' Общинските граници са недостъпни; рисковите зони не се показват.':'');api.failed=failed||municipalityFailed;if(api.onstatus)api.onstatus();}
+  api.mount=function(m){map=m;map.on('moveend',function(){drawRisks(data?data.times.indexOf(time/1000):-1);zoneMarkers();windFrame();});map.on('movestart',function(){stopWind();});map.on('resize',function(){drawRisks(data?data.times.indexOf(time/1000):-1);zoneMarkers();windFrame();});map.on('style.load',function(){if(active)render();});
     var refresh;map.on('sourcedata',function(e){if(!active||e.sourceId==='weather-zones'||e.sourceId==='weather-risks'||e.sourceId==='weather-warnings'||e.sourceId==='weather-forecast')return;clearTimeout(refresh);refresh=setTimeout(function(){if(!map.isMoving()&&!popup)zoneMarkers();},250);});};
   api.preview=function(t){zoneMarkers(t);};
   api.show=function(enabled,t,nextMode){
     active=enabled;time=t;if(nextMode)mode=nextMode;
     if(data&&Date.now()-data.generated>7200000)data=null;
     if(active&&!regions.length&&!regionsPending)regionsPending=fetch('weather-regions.geojson').then(function(r){if(!r.ok)throw new Error('Regions unavailable');return r.json();}).then(function(d){regions=d.features;zoneMarkers();}).catch(function(){}).finally(function(){regionsPending=null;});
+    if(active&&!municipalities&&!municipalitiesPending)municipalitiesPending=fetch('weather-municipalities.geojson',{signal:AbortSignal.timeout(15000)}).then(function(r){if(!r.ok)throw new Error('Municipalities unavailable');return r.json();}).then(function(d){
+      if(d.type!=='FeatureCollection'||!d.grid||!Array.isArray(d.features)||d.features.length!==265||d.features.some(function(f){return !f.properties||!Array.isArray(f.properties.cells)||!f.properties.cells.length||f.properties.cells.some(function(i){return !Number.isInteger(i)||i<0||i>=288;})||!f.geometry||!['Polygon','MultiPolygon'].includes(f.geometry.type);}))throw new Error('Invalid municipalities');
+      municipalities=d;municipalityFailed=false;riskData=null;render();
+    }).catch(function(){municipalityFailed=true;render();status('Прогнозата е налична само без общински рискови зони.',false);}).finally(function(){municipalitiesPending=null;});
     render();if(!active||data||pending)return;
     status('Зареждане на метеорологичните зони…',false);
     pending=fetch('/.netlify/functions/weather-zones?v=4',{signal:AbortSignal.timeout(20000)}).then(function(r){if(!r.ok)throw new Error('Unavailable');return r.json();}).then(function(d){

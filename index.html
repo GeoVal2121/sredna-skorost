@@ -13,7 +13,7 @@
 <link rel="icon" href="icon-gantry-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icon-gantry-180.png">
 <link rel="stylesheet" href="lib/maplibre-gl.css?v=ab1e70d59ec4">
-<link rel="stylesheet" href="weather.css?v=2026.11.18-1">
+<link rel="stylesheet" href="weather.css?v=2026.11.18-2">
 <style>
 :root{--bg:#eef1f4;--panel:#fffffff2;--line:#d8dee6;--tx:#1f2933;--mut:#5f6b7a;--ok:#188038;--warn:#e37400;--bad:#d93025;--acc:#1a73e8;
   --st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);--sl:env(safe-area-inset-left,0px);--sr:env(safe-area-inset-right,0px)}
@@ -294,7 +294,7 @@ html.dark .road-badge{background:#223e64;color:#d6e7ff;border-color:#5578a6}
   <div class="weather-legend"><span id="weatherUnits">Валежи (мм/ч)</span><span>· Българско време</span></div>
   <img id="weatherLegend" alt="Легенда за валежите">
   <p class="weather-reading-help">Всяко означение показва прогнозата за посоченото място и избрания час. Натиснете го за вятър и валежи. Стрелката сочи накъде духа вятърът спрямо картата. Моделът е с приблизителна резолюция 25 км.</p>
-  <p class="weather-reading-help">Сиво-син контур: мъгла. Пунктиран кехлибарен контур: прогнозен риск от заледяване. Това са приблизителни моделни зони (~25 км), а не наблюдения на пътната настилка. Цветните предупреждения с надпис НИМХ са официални.</p>
+  <p class="weather-reading-help">Жълт общински контур: прогнозна мъгла. Син: риск от заледяване. Оцветяването означава прогнозен сигнал в части от общината (~25 км модел), а не явление навсякъде в нея или наблюдение на настилката. Предупрежденията с надпис НИМХ са официални. Общински граници: <a href="https://www.geoboundaries.org/" target="_blank" rel="noopener">geoBoundaries / Wikimedia, 2019</a>.</p>
   <p id="weatherZoneStatus" role="status"></p><p id="weatherStatus" role="status"></p><p id="warningStatus" role="status"></p>
   <details id="weatherDetails" hidden><summary>Предупреждения по райони</summary><ul id="weatherList"></ul></details>
   <p class="weather-credit">Предупреждения: НИМХ чрез EUMETNET–MeteoAlarm.<br>© EuroGeographics за административните граници</p>
@@ -381,21 +381,21 @@ html.dark .road-badge{background:#223e64;color:#d6e7ff;border-color:#5578a6}
 <div class="toast" id="toast"></div>
 
 </div>
-<script defer src="install.js?v=2026.11.18-1"></script>
-<script defer src="viewport.js?v=2026.11.18-1"></script>
-<script defer src="towns.js?v=2026.11.18-1"></script>
-<script defer src="data.js?v=2026.11.18-1"></script>
-<script defer src="roadlim.js?v=2026.11.18-1"></script>
-<script defer src="cameras.js?v=2026.11.18-1"></script>
-<script defer src="geometry.js?v=2026.11.18-1"></script>
-<script defer src="direction-geometry.js?v=2026.11.18-1"></script>
-<script defer src="core.js?v=2026.11.18-1"></script>
-<script defer src="app.js?v=2026.11.18-1"></script>
+<script defer src="install.js?v=2026.11.18-2"></script>
+<script defer src="viewport.js?v=2026.11.18-2"></script>
+<script defer src="towns.js?v=2026.11.18-2"></script>
+<script defer src="data.js?v=2026.11.18-2"></script>
+<script defer src="roadlim.js?v=2026.11.18-2"></script>
+<script defer src="cameras.js?v=2026.11.18-2"></script>
+<script defer src="geometry.js?v=2026.11.18-2"></script>
+<script defer src="direction-geometry.js?v=2026.11.18-2"></script>
+<script defer src="core.js?v=2026.11.18-2"></script>
+<script defer src="app.js?v=2026.11.18-2"></script>
 <script defer src="lib/maplibre-gl.js?v=45a9b07a9189"></script>
-<script defer src="weather-zones.js?v=2026.11.18-1"></script>
-<script defer src="weather.js?v=2026.11.18-1"></script>
-<script defer src="map.js?v=2026.11.18-1"></script>
-<script defer src="navcore.js?v=2026.11.18-1"></script>
-<script defer src="nav.js?v=2026.11.18-1"></script>
+<script defer src="weather-zones.js?v=2026.11.18-2"></script>
+<script defer src="weather.js?v=2026.11.18-2"></script>
+<script defer src="map.js?v=2026.11.18-2"></script>
+<script defer src="navcore.js?v=2026.11.18-2"></script>
+<script defer src="nav.js?v=2026.11.18-2"></script>
 </body>
 </html>

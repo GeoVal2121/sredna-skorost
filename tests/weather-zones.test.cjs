@@ -67,15 +67,20 @@ test('allocation-free interpolation matches the original numeric formula and reu
  d.cells[0][1][0]=null;assert.equal(sample(d,0,22.5,41.5,[0,1,2],out)[1],null);
 });
 
-test('hazard contours merge neighbours, preserve holes and exclude temperature-only ice',()=>{
+test('municipal risks preserve actual boundaries and require a local forecast signal',()=>{
  const {riskZones,contains}=require('../weather-zones.js');
- const d={grid:{west:22,south:41,cols:5,rows:5,step:.3},cells:Array.from({length:25},()=>[[-8],[80],[0],[0],[0],[0],[45]])};
- d.cells[12][6][0]=null;
- const fc=riskZones(d,0);assert.equal(fc.features.length,1);const f=fc.features[0];
- assert.equal(f.properties.kind,'fog');assert.equal(f.geometry.coordinates.length,2);
- assert(contains(f.geometry,[22.15,41.15]));assert(!contains(f.geometry,[22.6,41.6]));
- d.cells.forEach(c=>c[6][0]=null);assert.equal(riskZones(d,0).features.length,0);
- d.cells[6][6][0]=66;d.cells[7][6][0]=67;d.cells[18][6][0]=48;
- const hazards=riskZones(d,0).features;assert.equal(hazards.filter(f=>f.properties.kind==='ice').length,2);assert.equal(hazards.filter(f=>f.properties.kind==='fog').length,1);
- hazards.forEach(f=>f.geometry.coordinates.forEach(r=>assert.deepEqual(r[0],r.at(-1))));
+ const municipalities=JSON.parse(require('node:fs').readFileSync(require('node:path').join(__dirname,'../weather-municipalities.geojson'),'utf8'));
+ assert.equal(municipalities.features.length,265);
+ const kostenets=municipalities.features.find(f=>f.properties.name==='Kostenets');assert(kostenets);assert(contains(kostenets.geometry,[23.85,42.30]));
+ const d={grid:municipalities.grid,cells:Array.from({length:288},()=>[[-8,-8],[80,80],[0,0],[0,0],[0,0],[0,0],[null,null]])};
+ assert.equal(riskZones(d,0,municipalities).features.length,0,'cold temperature is not ice');
+ d.cells[kostenets.properties.cells[0]][6]=[45,66];
+ for(const [h,kind] of [[0,'fog'],[1,'ice']]){
+  const fc=riskZones(d,h,municipalities),f=fc.features.find(f=>f.properties.municipality==='Kostenets');assert.equal(f.properties.kind,kind);assert.deepEqual(f.geometry,kostenets.geometry);
+  fc.features.forEach(f=>{const source=municipalities.features.find(m=>m.properties.name===f.properties.municipality);assert(source.properties.cells.includes(kostenets.properties.cells[0]));assert.deepEqual(f.geometry,source.geometry);});
+ }
+ assert.equal(riskZones(d,0,null).features.length,0,'missing boundaries never fall back to grid tiles');
+ assert.equal(riskZones({...d,grid:{...d.grid,step:.5}},0,municipalities).features.length,0,'mapping must match forecast grid');
+ d.cells[kostenets.properties.cells[0]][6][0]=48;assert.deepEqual(riskZones(d,0,municipalities).features.filter(f=>f.properties.municipality==='Kostenets').map(f=>f.properties.kind),['fog','ice']);
+ municipalities.features.forEach(f=>{assert(f.properties.cells.length);f.properties.cells.forEach(i=>assert(Number.isInteger(i)&&i>=0&&i<288));});
 });
