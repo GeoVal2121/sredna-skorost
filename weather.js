@@ -113,7 +113,7 @@
   if (typeof document === 'undefined') return;
 
   var $=function(id){return document.getElementById(id);}, map, enabled=false, selected=hour(Date.now()), mode="precip";
-  var warningMarkers=[],alerts=[], fetched=0, updated=0, regions, busy=false, seq=0, popup, tileFailed=false, warningFailed=false, warningCount=0;
+  var warningMarkers=[],alerts=[], fetched=0, updated=0, regions, busy=false, seq=0, tileFailed=false, warningFailed=false, warningCount=0;
   function badge() {
     var failed=(mode==='precip'&&tileFailed)||warningFailed||(root.SSWeatherZones&&SSWeatherZones.failed), b=$('weatherInfoBtn');
     b.textContent=failed?'!':warningCount?'⚠ '+warningCount:'ⓘ';
@@ -127,13 +127,23 @@
     return json ? r.json() : r.text();
   }
   function sourceData() { return fetched && Date.now()-fetched < 900000 ? combine(alerts,selected) : {type:'FeatureCollection',features:[],unmapped:[]}; }
-  function popupFor(p,lngLat) {
-    if (popup) popup.remove();
-    var box=document.createElement('div');box.className='weather-popup';
-    var title=document.createElement('strong');title.textContent=p.title+' · '+p.area;box.append(title);
-    ['НИМХ · '+({2:'жълт',3:'оранжев',4:'червен'}[p.level])+' код',label(p.start)+' – '+label(p.end),p.description,p.instruction].filter(Boolean).forEach(function(s){var n=document.createElement('p');n.textContent=s;box.append(n);});
-    var a=document.createElement('a');a.href='https://weather.bg/obshtini/';a.target='_blank';a.rel='noopener';a.textContent='Официален източник: НИМХ';box.append(a);
-    popup=new maplibregl.Popup({maxWidth:'290px'}).setLngLat(lngLat).setDOMContent(box).addTo(map);
+  function positionWarnings() {
+    if(!enabled||!root.SSWeatherZones)return;
+    var box=map.getContainer().getBoundingClientRect(),obstacles=Array.from(document.querySelectorAll('.top,.chips,.side,.spdw,.maplibregl-ctrl,#weatherPanel,#bottomBar')).map(function(e){return e.getBoundingClientRect();}).filter(function(r){return r.width&&r.height;});
+    warningMarkers.forEach(function(m){
+      var el=m.getElement(),candidates=[areaPoint(m.warningGeometry)],fits=false,fallback=null;el.style.visibility='hidden';
+      [.5,.35,.65,.2,.8,.1,.9].forEach(function(y){[.5,.35,.65,.2,.8,.1,.9].forEach(function(x){var ll=map.unproject([box.width*x,box.height*y]);candidates.push([ll.lng,ll.lat]);});});
+      for(var n=0;n<candidates.length;n++){
+        if(!map.getBounds().contains(candidates[n])||!SSWeatherZones.contains(m.warningGeometry,candidates[n]))continue;
+        var size=el.getBoundingClientRect(),screen=map.project(candidates[n]),r={left:box.left+screen.x-size.width/2,right:box.left+screen.x+size.width/2,top:box.top+screen.y-size.height/2,bottom:box.top+screen.y+size.height/2};
+        if(r.left<box.left+8||r.right>box.right-8||r.top<box.top+8||r.bottom>box.bottom-8||obstacles.some(function(o){return r.left<o.right+5&&r.right>o.left-5&&r.top<o.bottom+5&&r.bottom>o.top-5;}))continue;
+        if(!fallback)fallback={point:candidates[n],rect:r};
+        if(![[r.left,r.top],[r.right,r.top],[r.right,r.bottom],[r.left,r.bottom]].every(function(p){var ll=map.unproject([p[0]-box.left,p[1]-box.top]);return SSWeatherZones.contains(m.warningGeometry,[ll.lng,ll.lat]);}))continue;
+        fits=true;m.setLngLat(candidates[n]);el.style.visibility='visible';obstacles.push(r);break;
+      }
+      if(!fits&&fallback){m.setLngLat(fallback.point);fits=true;el.style.visibility='visible';obstacles.push(fallback.rect);}
+      el.setAttribute('aria-hidden',String(!fits));
+    });
   }
   function updateWarnings() {
     if (!map || !map.getSource('weather-warnings')) return;
@@ -141,18 +151,21 @@
     warningMarkers.forEach(function(m){m.remove();});warningMarkers=[];
     if(enabled){var labeled=new Set();data.features.forEach(function(f){
       var p=f.properties,key=p.id+':'+p.area;if(labeled.has(key))return;labeled.add(key);
-      var el=document.createElement('button');el.type='button';el.className='weather-warning-label';el.style.setProperty('--warning-color',p.color);
-      var icon=document.createElement('span');icon.textContent='⚠';el.append(icon,document.createTextNode(p.title+' · НИМХ'));el.title=p.title+' · '+p.area+' · НИМХ';
-      el.setAttribute('aria-label',p.title+' · '+p.area+' · НИМХ');var point=areaPoint(f.geometry);
-      el.onclick=function(e){e.stopPropagation();popupFor(p,point);};
-      warningMarkers.push(new maplibregl.Marker({element:el,anchor:'center'}).setLngLat(point).addTo(map));
+      var el=document.createElement('div');el.className='weather-warning-label';el.style.setProperty('--warning-color',p.color);
+      var icon=document.createElement('span');icon.className='weather-warning-icon';icon.textContent='⚠';
+      var text=document.createElement('span'),title=document.createElement('strong'),until=document.createElement('small');
+      title.textContent=p.title+' · НИМХ';until.textContent=({2:'Жълт',3:'Оранжев',4:'Червен'}[p.level])+' код - до '+label(p.end).replace(/(\d{2}\.\d{2}),/,'$1.,');text.append(title,until);el.append(icon,text);
+      el.title=p.title+' · '+p.area;el.setAttribute('aria-label',p.title+' · '+p.area+' · '+until.textContent);
+      var marker=new maplibregl.Marker({element:el,anchor:'center'}).setLngLat(areaPoint(f.geometry)).addTo(map);marker.warningGeometry=f.geometry;warningMarkers.push(marker);
     });}
 
+    positionWarnings();
     var list=$('weatherList');list.replaceChildren();var seen=new Set();
     data.features.map(function(f){return f.properties;}).concat(data.unmapped).forEach(function(p){
       var k=p.id+':'+p.area;if(seen.has(k))return;seen.add(k);
-      var li=document.createElement('li'),b=document.createElement('button');b.type='button';b.textContent=p.title+' · '+p.area+' · '+({2:'жълт',3:'оранжев',4:'червен'}[p.level])+' код';
-      b.onclick=function(){$('weatherInfo').close();popupFor(p,map.getCenter());};li.append(b);list.append(li);
+      var li=document.createElement('li'),details=document.createElement('details'),summary=document.createElement('summary');summary.textContent=p.title+' · '+p.area+' · '+({2:'жълт',3:'оранжев',4:'червен'}[p.level])+' код';details.append(summary);
+      [label(p.start)+' – '+label(p.end),p.description,p.instruction].filter(Boolean).forEach(function(s){var line=document.createElement('p');line.textContent=s;details.append(line);});
+      var source=document.createElement('a');source.href='https://weather.bg/obshtini/';source.target='_blank';source.rel='noopener';source.textContent='Официален източник: НИМХ';details.append(source);li.append(details);list.append(li);
     });
     $('weatherDetails').hidden=!seen.size;
     warningCount=seen.size;badge();
@@ -202,7 +215,7 @@
     $('weatherLegend').alt='Валежи — милиметри на час';
     $('weatherUnits').textContent=layerNames[mode]+' · '+layerUnits[mode];$('weatherLegend').hidden=mode!=='precip';$('weatherScale').textContent=layerUnits[mode];$('weatherScale').dataset.mode=mode;
     if(mode==='precip' && map && map.getSource('weather-forecast')) map.getSource('weather-forecast').setTiles([tileURL('precip',selected)]);
-    style();if(popup){popup.remove();popup=null;}
+    style();
   }
   async function refreshWarnings() {
     if (busy || !enabled || (fetched && Date.now()-fetched<300000)) return;
@@ -237,7 +250,7 @@
   function toggle() {
     enabled=!enabled;seq++;$('weatherPanel').hidden=!enabled;$('weatherToggle').setAttribute('aria-pressed',String(enabled));
     document.body.classList.toggle('weather-open',enabled);
-    if(enabled){selected=hour(Date.now());$('weatherHour').value=0;forecast();refreshWarnings();}else{style();if(popup)popup.remove();}
+    if(enabled){selected=hour(Date.now());$('weatherHour').value=0;forecast();refreshWarnings();}else{style();}
   }
   api.mount=function(m){
     map=m;
@@ -245,12 +258,9 @@
     map.on('style.load',function(){labelPaint={};if(enabled)style();});
     map.on('error',function(e){if(enabled && mode==='precip' && e.sourceId==='weather-forecast'){tileFailed=true;badge();$('weatherStatus').textContent='Прогнозният слой не е достъпен за този час.';}});
     map.on('sourcedata',function(e){if(enabled && mode==='precip' && e.sourceId==='weather-forecast' && e.isSourceLoaded && !tileFailed)$('weatherStatus').textContent='Прогнозен модел · обща картина, не точност по улици';});
-    map.on('click','weather-warning-fill',function(e){
-      if(!enabled)return;
-      var ids=['pts-hit','secs','secs-up','cams'].filter(function(id){return !!map.getLayer(id);});
-      if(ids.length && map.queryRenderedFeatures(e.point,{layers:ids}).length)return;
-      popupFor(e.features[0].properties,e.lngLat);
-    });
+    var warningFrame=0;
+    map.on('move',function(){if(enabled&&!warningFrame)warningFrame=requestAnimationFrame(function(){warningFrame=0;positionWarnings();});});
+    map.on('moveend',positionWarnings);map.on('resize',positionWarnings);
     $('weatherToggle').onclick=function(){menu($('weatherMenu').hidden);};$('weatherClose').onclick=function(){choose('off');};
     document.querySelectorAll('#weatherMenu [data-layer]').forEach(function(b){b.onclick=function(){choose(b.dataset.layer);};});
     document.addEventListener('pointerdown',function(e){if(!$('weatherMenu').contains(e.target)&&!$('weatherToggle').contains(e.target))menu(false);});
