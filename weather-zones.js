@@ -309,7 +309,7 @@
     }).catch(function(){municipalityFailed=true;render();status('Прогнозата е налична само без общински рискови зони.',false);}).finally(function(){municipalitiesPending=null;});
     render();if(!active||data||pending)return;
     status('Зареждане на метеорологичните зони…',false);
-    pending=fetch('/.netlify/functions/weather-zones?v=5',{signal:AbortSignal.timeout(20000)}).then(function(r){if(!r.ok)throw new Error('Unavailable');return r.json();}).then(function(d){
+    pending=fetch('/.netlify/functions/weather-zones?v=5',{signal:AbortSignal.timeout(25000)}).then(function(r){if(!r.ok)throw new Error('Unavailable');return r.json();}).then(function(d){
       if(!d.grid||d.grid.cols!==24||d.grid.rows!==12||!Array.isArray(d.cells)||d.cells.length!==288||!Array.isArray(d.times)||!Number.isFinite(d.generated)||Date.now()-d.generated>7200000||d.model!=='icon_eu'||d.windComponents!=='towards-east-north-kmh'||d.cells.some(function(c){return !Array.isArray(c)||c.length!==9||c.some(function(a){return !Array.isArray(a)||a.length!==d.times.length||a.some(function(v){return v!==null&&!Number.isFinite(v);});});}))throw new Error('Invalid grid');
       data=d;api.failed=false;render();
     }).catch(function(){data=null;render();status('Метеорологичните зони са недостъпни.',true);}).finally(function(){pending=null;});

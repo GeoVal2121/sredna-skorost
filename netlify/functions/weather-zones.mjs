@@ -14,7 +14,7 @@ export default async function handler(request) {
         const batch=points.slice(start,start+48);
         const url=new URL('https://api.open-meteo.com/v1/forecast');
         url.search=new URLSearchParams({latitude:batch.map(p=>p[0]).join(','),longitude:batch.map(p=>p[1]).join(','),hourly:fields.join(','),models:'icon_eu',forecast_hours:'60',past_hours:'3',timezone:'GMT',timeformat:'unixtime',wind_speed_unit:'kmh'});
-        const r=await fetch(url,{signal:AbortSignal.timeout(12000),redirect:'error'});
+        const r=await fetch(url,{signal:AbortSignal.timeout(20000),redirect:'error'});
         if (!r.ok || !/json/i.test(r.headers.get('content-type')||'')) throw new Error('Unavailable');
         const body=await r.json();
         if (!Array.isArray(body) || body.length!==batch.length) throw new Error('Incomplete grid');
