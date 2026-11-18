@@ -66,3 +66,16 @@ test('allocation-free interpolation matches the original numeric formula and reu
  }
  d.cells[0][1][0]=null;assert.equal(sample(d,0,22.5,41.5,[0,1,2],out)[1],null);
 });
+
+test('hazard contours merge neighbours, preserve holes and exclude temperature-only ice',()=>{
+ const {riskZones,contains}=require('../weather-zones.js');
+ const d={grid:{west:22,south:41,cols:5,rows:5,step:.3},cells:Array.from({length:25},()=>[[-8],[80],[0],[0],[0],[0],[45]])};
+ d.cells[12][6][0]=null;
+ const fc=riskZones(d,0);assert.equal(fc.features.length,1);const f=fc.features[0];
+ assert.equal(f.properties.kind,'fog');assert.equal(f.geometry.coordinates.length,2);
+ assert(contains(f.geometry,[22.15,41.15]));assert(!contains(f.geometry,[22.6,41.6]));
+ d.cells.forEach(c=>c[6][0]=null);assert.equal(riskZones(d,0).features.length,0);
+ d.cells[6][6][0]=66;d.cells[7][6][0]=67;d.cells[18][6][0]=48;
+ const hazards=riskZones(d,0).features;assert.equal(hazards.filter(f=>f.properties.kind==='ice').length,2);assert.equal(hazards.filter(f=>f.properties.kind==='fog').length,1);
+ hazards.forEach(f=>f.geometry.coordinates.forEach(r=>assert.deepEqual(r[0],r.at(-1))));
+});
