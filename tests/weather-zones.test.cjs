@@ -16,9 +16,9 @@ test('fixed forecast endpoint validates upstream, hours and caches complete grid
   assert.equal((await handler(new Request(req.url,{method:'POST'}))).status,405);
   let calls=0,bad=true;
   global.fetch=async url=>{
-    calls++;assert.equal(url.hostname,'api.open-meteo.com');assert.equal(url.searchParams.get('models'),'icon_eu');assert.equal(url.searchParams.get('latitude').split(',').length,96);
+    calls++;assert.equal(url.hostname,'api.open-meteo.com');assert.equal(url.searchParams.get('models'),'icon_eu');assert.equal(url.searchParams.get('latitude').split(',').length,48);
     const time=Array.from({length:63},(_,i)=>Math.floor(Date.now()/3600000)*3600+(i-3)*3600);
-    return Response.json(Array.from({length:96},()=>({hourly:{time,temperature_2m:time.map(()=>bad?'wrong':2),cloud_cover:time.map(()=>80),precipitation:time.map(()=>.6),snowfall:time.map(()=>0),wind_speed_10m:time.map(()=>25),wind_direction_10m:time.map(()=>225),weather_code:time.map(()=>61),visibility:time.map(()=>20000),relative_humidity_2m:time.map(()=>90)}})));
+    return Response.json(Array.from({length:48},()=>({hourly:{time,temperature_2m:time.map(()=>bad?'wrong':2),cloud_cover:time.map(()=>80),precipitation:time.map(()=>.6),snowfall:time.map(()=>0),wind_speed_10m:time.map(()=>25),wind_direction_10m:time.map(()=>225),weather_code:time.map(()=>61),visibility:time.map(()=>20000),relative_humidity_2m:time.map(()=>90)}})));
   };
   try{
     assert.equal((await handler(req)).status,502);bad=false;

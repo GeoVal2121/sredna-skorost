@@ -10,8 +10,8 @@ export default async function handler(request) {
       const points=Array.from({length:grid.cols*grid.rows},(_,i)=>[
         (grid.south+Math.floor(i/grid.cols)*grid.step).toFixed(2),
         (grid.west+i%grid.cols*grid.step).toFixed(2)]);
-      const batches=await Promise.all([0,96,192].map(async start=>{
-        const batch=points.slice(start,start+96);
+      const batches=await Promise.all([0,48,96,144,192,240].map(async start=>{
+        const batch=points.slice(start,start+48);
         const url=new URL('https://api.open-meteo.com/v1/forecast');
         url.search=new URLSearchParams({latitude:batch.map(p=>p[0]).join(','),longitude:batch.map(p=>p[1]).join(','),hourly:fields.join(','),models:'icon_eu',forecast_hours:'60',past_hours:'3',timezone:'GMT',timeformat:'unixtime',wind_speed_unit:'kmh'});
         const r=await fetch(url,{signal:AbortSignal.timeout(12000),redirect:'error'});
