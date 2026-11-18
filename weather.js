@@ -192,14 +192,12 @@
     if (!map || !map.getLayer('route')) return;
     var before=(map.getStyle().layers||[]).find(function(l){return l['source-layer']==='building'||l.type==='fill-extrusion'||(l.type==='line'&&l['source-layer']==='transportation');}) || (map.getStyle().layers||[]).find(function(l){return l.id==='route-case';});
     before=before?before.id:undefined;
-    if (!map.getSource('weather-forecast')) {
-      map.addSource('weather-forecast',{type:'raster',tiles:[tileURL('precip',selected)],tileSize:256,maxzoom:6,attribution:'© <a href="https://www.weatherapi.com/">WeatherAPI</a>'});
-      map.addLayer({id:'weather-forecast',type:'raster',source:'weather-forecast',paint:{'raster-opacity':0.18,'raster-fade-duration':0}},before);
+    if (!map.getSource('weather-warnings')) {
       map.addSource('weather-warnings',{type:'geojson',data:sourceData()});
-      map.addLayer({id:'weather-warning-fill',type:'fill',source:'weather-warnings',paint:{'fill-color':['get','color'],'fill-opacity':0.09}},before);
-      map.addLayer({id:'weather-warning-line',type:'line',source:'weather-warnings',paint:{'line-color':['get','color'],'line-width':1.2}},before);
+      map.addLayer({id:'weather-warning-fill',type:'fill',source:'weather-warnings',paint:{'fill-color':['get','color'],'fill-opacity':0}},before);
+      map.addLayer({id:'weather-warning-line',type:'line',source:'weather-warnings',paint:{'line-color':['get','color'],'line-width':1,'line-opacity':.7,'line-blur':.4}},before);
     }
-    ['weather-forecast','weather-warning-fill','weather-warning-line'].forEach(function(id){map.setLayoutProperty(id,'visibility',enabled&&(id!=='weather-forecast'||mode==='precip')?'visible':'none');});
+    ['weather-warning-fill','weather-warning-line'].forEach(function(id){map.setLayoutProperty(id,'visibility',enabled&&(id!=='weather-forecast'||mode==='precip')?'visible':'none');});
     labelContrast();
     updateWarnings();
     if(root.SSWeatherZones)SSWeatherZones.show(enabled,selected,mode);
@@ -210,11 +208,10 @@
     tileFailed=false;badge();
     $('weatherTime').textContent=layerNames[mode]+' · '+label(selected);
     $('weatherHour').setAttribute('aria-valuetext',label(selected)+' българско време');
-    $('weatherStatus').textContent=mode==='precip'?'Зареждане на прогнозата…':'Прогнозен модел · обща картина, не точност по улици';
+    $('weatherStatus').textContent='Прогнозен модел · обща картина, не точност по улици';
     $('weatherLegend').src='https://weathermaps.weatherapi.com/img/legend_precip_gradient.png';
     $('weatherLegend').alt='Валежи — милиметри на час';
     $('weatherUnits').textContent=layerNames[mode]+' · '+layerUnits[mode];$('weatherLegend').hidden=mode!=='precip';$('weatherScale').textContent=layerUnits[mode];$('weatherScale').dataset.mode=mode;
-    if(mode==='precip' && map && map.getSource('weather-forecast')) map.getSource('weather-forecast').setTiles([tileURL('precip',selected)]);
     style();
   }
   async function refreshWarnings() {

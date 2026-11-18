@@ -30,8 +30,8 @@ body.weather-open .maplibregl-ctrl-top-right{top:auto!important;bottom:calc(var(
 #weatherZoneStatus{font-size:12px;margin:8px 0;color:var(--mut)}
 
 .weather-reading-help{font-size:12px;color:var(--mut);margin:8px 0}
-.weather-place-label{display:flex;align-items:center;gap:7px;min-height:32px;padding:4px 10px;border:1px solid #d9f3ff99;border-radius:22px;background:rgba(196,233,255,.45);color:#092b50;font:600 13px/1.2 system-ui;box-shadow:0 1px 3px #001b3826;cursor:pointer;white-space:nowrap}
-.weather-place-label img,.weather-place-details img{width:22px;height:22px;flex:none;filter:invert(13%) sepia(34%) saturate(1624%) hue-rotate(174deg)}
+.weather-place-label{display:flex;align-items:center;gap:4px;min-height:24px;padding:2px;border:0;border-radius:0;background:none;color:#17364a;font:500 12px/1.2 system-ui;box-shadow:none;text-shadow:0 0 2px #fff,0 1px 2px #fff;cursor:pointer;white-space:nowrap}
+.weather-place-label img,.weather-place-details img{width:18px;height:18px;flex:none;filter:invert(13%) sepia(34%) saturate(1624%) hue-rotate(174deg)}
 .weather-place-label:focus-visible,.weather-place-label[aria-expanded=true]{outline:2px solid #168cff;outline-offset:1px}
 html .weather-place-popup .maplibregl-popup-content,html.dark .weather-place-popup .maplibregl-popup-content{background:rgba(196,233,255,.45);color:#092b50;border:1px solid #d9f3ff99;border-radius:16px;padding:12px 27px 12px 13px;box-shadow:0 2px 6px #001b3826}
 .weather-place-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip{border-bottom-color:rgba(196,233,255,.45)}
@@ -45,7 +45,7 @@ html .weather-place-popup .maplibregl-popup-close-button,html.dark .weather-plac
 
 .weather-place-label{z-index:2}.weather-place-popup{z-index:3}
 
-.weather-place-label,html .weather-place-popup .maplibregl-popup-content{backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+html .weather-place-popup .maplibregl-popup-content{backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
 #weatherMenu{position:fixed;z-index:10;width:190px;padding:6px;border:1px solid #b8d0dd99;border-radius:18px;background:rgba(235,247,252,.87);backdrop-filter:blur(12px);box-shadow:0 3px 15px #1233;color:#17364a}
 #weatherMenu[hidden]{display:none}
 #weatherMenu button{display:flex;align-items:center;gap:9px;width:100%;min-height:42px;padding:7px 9px;border:0;border-radius:11px;background:transparent;color:inherit;font:500 14px system-ui;text-align:left}
@@ -67,4 +67,4 @@ html.dark .weather-risk-label{color:#f3d16b;text-shadow:0 0 3px #172638,0 0 3px 
 #weatherList summary{cursor:pointer;padding:5px 0}#weatherList p{margin:5px 0;white-space:pre-line}
 
 .weather-wind{position:absolute;inset:0;pointer-events:none;width:100%;height:100%}
-html.dark .weather-place-label{background:rgba(89,127,148,.24);border-color:#b5d0dd66;color:#e0eef6;box-shadow:0 1px 3px #001b3815}html.dark .weather-place-label img{filter:invert(92%) sepia(9%) saturate(300%) hue-rotate(160deg)}
+html.dark .weather-place-label{background:none;border:0;color:#e0eef6;box-shadow:none;text-shadow:0 0 2px #172638,0 1px 2px #172638}html.dark .weather-place-label img{filter:invert(92%) sepia(9%) saturate(300%) hue-rotate(160deg)}
