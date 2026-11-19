@@ -153,6 +153,18 @@
       map.setFilter(l.id,names.length?(original?['all',original,exclude]:exclude):original);
     });
   }
+  function settlePlaceLabels(){
+    if(!active||!markers.length||map.isMoving())return;
+    var box=map.getContainer().getBoundingClientRect(),layers=map.getStyle().layers.filter(function(l){return l.type==='symbol'&&l['source-layer']==='place';}).map(function(l){return l.id;});
+    if(!layers.length)return;
+    var kept=markers.filter(function(marker){
+      var el=marker.getElement(),r=el.getBoundingClientRect(),name=el.firstChild.textContent;
+      var collision=map.queryRenderedFeatures([[r.left-box.left-4,r.top-box.top-4],[r.right-box.left+4,r.bottom-box.top+4]],{layers:layers}).some(function(f){var n=f.properties['name:bg']||f.properties.name;return n&&n!==name;});
+      if(collision)marker.remove();return !collision;
+    });
+    // Hiding a base label can reveal a neighboring label after MapLibre lays out symbols.
+    if(kept.length!==markers.length){markers=kept;placeNames(markers.map(function(m){return m.getElement().firstChild.textContent;}));}
+  }
   function zoneMarkers(t){
     closeDetails();markers.forEach(function(m){m.remove();});markers=[];
     var h=data?data.times.indexOf((typeof t==='number'?t:time)/1000):-1;if(!map.getStyle())return;if(!active||h<0){placeNames([]);return;}
@@ -180,15 +192,19 @@
       // Precipitation view matches the approved icon + temperature map labels.
       el.setAttribute('aria-label',place.name+': '+(mode==='overview'?c.text+', ':'')+value.textContent+'. Подробности за прогнозата');el.append(name,symbol,value);
       el.onclick=function(e){e.stopPropagation();details(place,h,el);};
-      var marker=new maplibregl.Marker({element:el,anchor:'center'}).setLngLat(place.point).addTo(map),r=el.getBoundingClientRect();
+      var marker=new maplibregl.Marker({element:el,anchor:'center'}).setLngLat(place.point).addTo(map),r=el.getBoundingClientRect(),anchor=map.project(place.point),width=r.width,height=r.height;
+      var placeLayers=map.getStyle().layers.filter(function(l){return l.type==='symbol'&&l['source-layer']==='place';}).map(function(l){return l.id;});
       var offsets=[[0,14],[0,-14],[0,28],[0,-28]],fits=false;
       for(var i=0;i<offsets.length;i++){
-        marker.setOffset(offsets[i]);r=el.getBoundingClientRect();
+        // Marker transforms update on the next frame; measure candidates from their projected anchor.
+        r={left:box.left+anchor.x+offsets[i][0]-width/2,right:box.left+anchor.x+offsets[i][0]+width/2,top:box.top+anchor.y+offsets[i][1]-height/2,bottom:box.top+anchor.y+offsets[i][1]+height/2};
+        var nearby=placeLayers.length?map.queryRenderedFeatures([[r.left-box.left-8,r.top-box.top-8],[r.right-box.left+8,r.bottom-box.top+8]],{layers:placeLayers}):[];
+        var coversName=nearby.some(function(f){var n=f.properties['name:bg']||f.properties.name;return n&&n!==place.name&&!seen.has(n);});
         var overlaps=obstacles.concat(occupied).some(function(o){return r.left<o.right+8&&r.right>o.left-8&&r.top<o.bottom+8&&r.bottom>o.top-8;});
-        if(!overlaps&&r.left>=box.left+8&&r.right<=box.right-8&&r.top>=box.top+8&&r.bottom<=box.bottom-8){fits=true;break;}
+        if(!coversName&&!overlaps&&r.left>=box.left+8&&r.right<=box.right-8&&r.top>=box.top+8&&r.bottom<=box.bottom-8){fits=true;break;}
       }
       if(!fits){marker.remove();return;}
-      occupied.push(r);markers.push(marker);seen.add(place.name);
+      marker.setOffset(offsets[i]);occupied.push(r);markers.push(marker);seen.add(place.name);
     });
     placeNames(Array.from(seen));
   }
@@ -238,7 +254,7 @@
     if(active&&data)status(h>=0?'Open-Meteo · ICON-EU за общия слой (~25 км). Рисковете се проверяват отделно в 3 вътрешни точки с ICON-EU и GFS. Общинският контур не е точната граница на явлението. Липсата на зона не изключва локална мъгла или поледица.':'Няма данни за зоните за този час.',h<0);
   }
   function status(message,failed){document.getElementById('weatherZoneStatus').textContent=message+(municipalityFailed?' Общинските граници са недостъпни; рисковите зони не се показват.':'')+(evidenceBusy?' Проверка на местните рискове…':'')+(evidenceFailed?' Част от местните проверки са недостъпни; липсата на зона не означава безопасни условия.':'');api.failed=failed||municipalityFailed||evidenceFailed;if(api.onstatus)api.onstatus();}
-  api.mount=function(m){map=m;map.on('moveend',function(){drawRisks(data?data.times.indexOf(time/1000):-1);zoneMarkers();loadRiskEvidence();});map.on('resize',function(){drawRisks(data?data.times.indexOf(time/1000):-1);zoneMarkers();loadRiskEvidence();});map.on('style.load',function(){if(active)render();});
+  api.mount=function(m){map=m;map.on('idle',settlePlaceLabels);map.on('moveend',function(){drawRisks(data?data.times.indexOf(time/1000):-1);zoneMarkers();loadRiskEvidence();});map.on('resize',function(){drawRisks(data?data.times.indexOf(time/1000):-1);zoneMarkers();loadRiskEvidence();});map.on('style.load',function(){if(active)render();});
     map.on('click',function(e){
       if(!active||!map.getLayer('weather-risk-fill')||e.originalEvent&&e.originalEvent.target.closest('.weather-risk-label,.weather-place-label,.weather-warning-label'))return;
       var priority=['weather-warning-fill','pts-hit','secs','secs-up','cams'].filter(function(id){return !!map.getLayer(id);});if(priority.length&&map.queryRenderedFeatures(e.point,{layers:priority}).length)return;
