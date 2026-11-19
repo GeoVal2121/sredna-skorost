@@ -143,6 +143,8 @@
         if(!map.getBounds().contains(candidates[n])||!SSWeatherZones.contains(m.warningGeometry,candidates[n]))continue;
         var size=el.getBoundingClientRect(),screen=map.project(candidates[n]),r={left:box.left+screen.x-size.width/2,right:box.left+screen.x+size.width/2,top:box.top+screen.y-size.height/2,bottom:box.top+screen.y+size.height/2};
         if(r.left<box.left+8||r.right>box.right-8||r.top<box.top+8||r.bottom>box.bottom-8||obstacles.some(function(o){return r.left<o.right+5&&r.right>o.left-5&&r.top<o.bottom+5&&r.bottom>o.top-5;}))continue;
+        var names=map.getStyle().layers.filter(function(l){return l.type==='symbol'&&l['source-layer']==='place';}).map(function(l){return l.id;});
+        if(names.length&&map.queryRenderedFeatures([[r.left-box.left-4,r.top-box.top-4],[r.right-box.left+4,r.bottom-box.top+4]],{layers:names}).length)continue;
         if(!fallback)fallback={point:candidates[n],rect:r};
         if(![[r.left,r.top],[r.right,r.top],[r.right,r.bottom],[r.left,r.bottom]].every(function(p){var ll=map.unproject([p[0]-box.left,p[1]-box.top]);return SSWeatherZones.contains(m.warningGeometry,[ll.lng,ll.lat]);}))continue;
         fits=true;m.setLngLat(candidates[n]);el.style.visibility='visible';obstacles.push(r);break;
@@ -203,7 +205,7 @@
     if (!map.getSource('weather-warnings')) {
       map.addSource('weather-warnings',{type:'geojson',data:sourceData()});
       map.addLayer({id:'weather-warning-fill',type:'fill',source:'weather-warnings',paint:{'fill-color':['get','color'],'fill-opacity':0}},before);
-      map.addLayer({id:'weather-warning-line',type:'line',source:'weather-warnings',paint:{'line-color':['get','color'],'line-width':1,'line-opacity':.7,'line-blur':.4}},before);
+      map.addLayer({id:'weather-warning-line',type:'line',source:'weather-warnings',paint:{'line-color':['get','color'],'line-width':2,'line-opacity':.95,'line-blur':.25}},before);
     }
     ['weather-warning-fill','weather-warning-line'].forEach(function(id){map.setLayoutProperty(id,'visibility',enabled&&(id!=='weather-forecast'||mode==='precip')?'visible':'none');});
     labelContrast();
