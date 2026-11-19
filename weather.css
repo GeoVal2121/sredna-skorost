@@ -68,3 +68,5 @@ html.dark .weather-risk-label{color:#f3d16b;text-shadow:0 0 3px #172638,0 0 3px 
 
 .weather-wind{position:absolute;inset:0;pointer-events:none;width:100%;height:100%}
 html.dark .weather-place-label{background:none;border:0;color:#e0eef6;box-shadow:none;text-shadow:0 0 2px #172638,0 1px 2px #172638}html.dark .weather-place-label img{filter:invert(92%) sepia(9%) saturate(300%) hue-rotate(160deg)}
+
+html .weather-place-label img.weather-condition-icon,html.dark .weather-place-label img.weather-condition-icon{filter:none;width:18px;height:18px}

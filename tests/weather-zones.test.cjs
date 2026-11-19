@@ -105,3 +105,11 @@ test('fog and ice risk keep unknowns and cold/dry separate from supported signal
  assert.equal(hazardSignal(m,3,'ice'),false);m.precipitation[1]=.5;assert.equal(hazardSignal(m,3,'ice'),'refreezing');m.temperature_2m[3]=null;assert.equal(hazardSignal(m,3,'ice'),null);
  m.weather_code[3]=48;m.temperature_2m[3]=4;assert.equal(hazardSignal(m,3,'ice'),false);
 });
+
+
+test('overview condition changes with forecast hour: sun, partial cloud, cloud, rain, snow',()=>{
+ const {condition}=require('../weather-zones.js');
+ const fields=[[17,16,15,12,0],[0,40,90,90,90],[0,0,0,1,1],[0,0,0,0,.2],[0,0,0,0,0],[0,0,0,0,0],[0,2,3,61,73]];
+ const d={grid:{west:22,south:41,cols:2,rows:2,step:1},cells:Array.from({length:4},()=>fields)};
+ assert.deepEqual([0,1,2,3,4].map(h=>condition(d,h,[22.5,41.5]).icon),['sun','partly-cloudy','cloud','cloud-rain','snowflake']);
+});

@@ -112,7 +112,7 @@
   root.SSWeather=api;
   if (typeof document === 'undefined') return;
 
-  var $=function(id){return document.getElementById(id);}, map, enabled=false, selected=hour(Date.now()), mode="precip";
+  var $=function(id){return document.getElementById(id);}, map, enabled=false, selected=hour(Date.now()), mode="overview";
   var warningMarkers=[],alerts=[], fetched=0, updated=0, regions, busy=false, seq=0, tileFailed=false, warningFailed=false, warningCount=0;
   function badge() {
     var failed=(mode==='precip'&&tileFailed)||warningFailed||(root.SSWeatherZones&&SSWeatherZones.failed), b=$('weatherInfoBtn');
@@ -211,7 +211,7 @@
     $('weatherStatus').textContent='Прогнозен модел · обща картина, не точност по улици';
     $('weatherLegend').src='https://weathermaps.weatherapi.com/img/legend_precip_gradient.png';
     $('weatherLegend').alt='Валежи — милиметри на час';
-    $('weatherUnits').textContent=layerNames[mode]+' · '+layerUnits[mode];$('weatherLegend').hidden=mode!=='precip';$('weatherScale').textContent=layerUnits[mode];$('weatherScale').dataset.mode=mode;
+    $('weatherUnits').textContent=layerNames[mode]+' · '+layerUnits[mode];$('weatherLegend').hidden=mode!=='precip';$('weatherScale').textContent=mode==='overview'?'':layerUnits[mode];$('weatherScale').hidden=mode==='overview';$('weatherScale').dataset.mode=mode;
     style();
   }
   async function refreshWarnings() {
@@ -233,8 +233,8 @@
       alerts=[];fetched=0;warningFailed=true;updateWarnings();$('warningStatus').textContent='НИМХ: данните не са достъпни. Провери официалната карта.';
     } finally {busy=false;if(generation!==seq && enabled)refreshWarnings();}
   }
-  var layerNames={temperature:'Температура',precip:'Валежи',wind:'Вятър',cloud:'Облачност'};
-  var layerUnits={temperature:'Студено → Топло · °C',precip:'Слаб → Силен валеж · мм/ч',wind:'Слаб → Силен · км/ч',cloud:'Ясно → Облачно · %'};
+  var layerNames={overview:'Времето',temperature:'Температура',precip:'Валежи',wind:'Вятър',cloud:'Облачност'};
+  var layerUnits={overview:'Състояние и температура · °C',temperature:'Студено → Топло · °C',precip:'Слаб → Силен валеж · мм/ч',wind:'Слаб → Силен · км/ч',cloud:'Ясно → Облачно · %'};
   function menu(open){
     var el=$('weatherMenu');el.hidden=!open;$('weatherToggle').setAttribute('aria-expanded',String(open));
     if(open){var r=$('weatherToggle').getBoundingClientRect();el.style.left=Math.max(8,r.left-el.offsetWidth-10)+'px';el.style.top=Math.max(8,Math.min(innerHeight-el.offsetHeight-8,r.top-el.offsetHeight+ r.height))+'px';el.querySelector('[data-layer="'+mode+'"]').focus();}
@@ -258,7 +258,7 @@
     var warningFrame=0;
     map.on('move',function(){if(enabled&&!warningFrame)warningFrame=requestAnimationFrame(function(){warningFrame=0;positionWarnings();});});
     map.on('moveend',positionWarnings);map.on('resize',positionWarnings);
-    $('weatherToggle').onclick=function(){menu($('weatherMenu').hidden);};$('weatherClose').onclick=function(){choose('off');};
+    $('weatherToggle').onclick=function(){if(!enabled)choose('overview');else menu($('weatherMenu').hidden);};$('weatherClose').onclick=function(){choose('off');};
     document.querySelectorAll('#weatherMenu [data-layer]').forEach(function(b){b.onclick=function(){choose(b.dataset.layer);};});
     document.addEventListener('pointerdown',function(e){if(!$('weatherMenu').contains(e.target)&&!$('weatherToggle').contains(e.target))menu(false);});
     document.addEventListener('keydown',function(e){if($('weatherMenu').hidden)return;if(e.key==='Escape'){menu(false);$('weatherToggle').focus();}else if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();var items=Array.from($('weatherMenu').querySelectorAll('button')),i=items.indexOf(document.activeElement);items[e.key==='Home'?0:e.key==='End'?items.length-1:(i+(e.key==='ArrowDown'?1:-1)+items.length)%items.length].focus();}});

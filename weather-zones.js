@@ -49,7 +49,7 @@
   }
   function condition(d,h,point){
     var v=sample(d,h,point[0],point[1]);
-    return conditions(d,h,point[0],point[1]).find(function(c){return c.kind!=='wind';})||(!v||v[1]===null?{icon:'cloud',text:'Няма данни за облачността'}:v[1]>=50?{icon:'cloud',text:'Облачно'}:{icon:'sun',text:'Ясно'});
+    return conditions(d,h,point[0],point[1]).find(function(c){return c.kind!=='wind';})||(!v||v[1]===null?{icon:'cloud',text:'Няма данни за облачността'}:v[1]>=75?{icon:'cloud',text:'Облачно'}:v[1]>=25?{icon:'partly-cloudy',text:'Променлива облачност'}:{icon:'sun',text:'Ясно'});
   }
   function contains(geometry,p){
     function ring(r){var inside=false;for(var i=0,j=r.length-1;i<r.length;j=i++)if((r[i][1]>p[1])!==(r[j][1]>p[1])&&p[0]<(r[j][0]-r[i][0])*(p[1]-r[i][1])/(r[j][1]-r[i][1])+r[i][0])inside=!inside;return inside;}
@@ -82,7 +82,7 @@
   }
   var api={sample:sample,windAt:windAt,thermometer:thermometer,conditions:conditions,condition:condition,contains:contains,riskZones:riskZones,riskCandidates:riskCandidates,fogSignal:fogSignal,hazardSignal:hazardSignal};root.SSWeatherZones=api;if(typeof module!=='undefined')module.exports=api;
   if(typeof document==='undefined')return;
-  var map,data,pending,active=false,time=0,mode="precip";
+  var map,data,pending,active=false,time=0,mode="overview";
   var $=function(id){return document.getElementById(id);};
   var markers=[],popup,municipalities,municipalitiesPending,municipalityFailed=false;
   var evidence={},evidenceBusy=0,evidencePending=new Set(),evidenceRetry={},evidenceFailed=false;
@@ -173,11 +173,12 @@
       var c=condition(data,h,place.point),temp=v[0]===null?'— °C':Math.round(v[0])+'°C';
       var el=document.createElement('button');el.type='button';el.className='weather-place-label';el.setAttribute('aria-expanded','false');el.setAttribute('aria-label',place.name+': '+c.text+', '+temp+'. Подробности за прогнозата');
       var name=document.createElement('span');name.textContent=place.name;var value=document.createElement('span');value.textContent=temp;
-      var symbol=icon(mode==='temperature'?c.icon:mode==='wind'?'wind':mode==='cloud'?'cloud':c.icon);
+      var symbol=icon(mode==='temperature'?'temperature':mode==='wind'?'wind':mode==='cloud'?'cloud':c.icon);
+      if(mode==='overview'){symbol.src='lib/weather-icons/color/'+c.icon+'.svg';symbol.classList.add('weather-condition-icon');}
       if(mode==='wind'){var w=windAt(data,h,place.point[0],place.point[1]);value.textContent=w?Math.round(w.speed)+' км/ч':'— км/ч';if(w&&w.speed>=.5){symbol=icon('arrow-up');symbol.style.transform='rotate('+(w.towards-map.getBearing())+'deg)';}}
       if(mode==='cloud')value.textContent=v[1]===null?'— %':Math.round(v[1])+'%';
       // Precipitation view matches the approved icon + temperature map labels.
-      el.setAttribute('aria-label',place.name+': '+value.textContent+'. Подробности за прогнозата');el.append(name,symbol,value);
+      el.setAttribute('aria-label',place.name+': '+(mode==='overview'?c.text+', ':'')+value.textContent+'. Подробности за прогнозата');el.append(name,symbol,value);
       el.onclick=function(e){e.stopPropagation();details(place,h,el);};
       var marker=new maplibregl.Marker({element:el,anchor:'center'}).setLngLat(place.point).addTo(map),r=el.getBoundingClientRect();
       var offsets=[[0,14],[0,-14],[0,28],[0,-28]],fits=false;
