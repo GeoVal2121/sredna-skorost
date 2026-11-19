@@ -28,3 +28,11 @@ for(const f of regions.features){const g=f.geometry,ps=g.type==='Polygon'?[g.coo
  }finally{global.fetch=original;}
  console.log('PASS weather: UTC rollover, expiry/cancellation, all 28 region centres, bounded proxy and upstream failure');
 })().catch(e=>{console.error(e);process.exitCode=1});
+
+// Different CAP identifiers must not duplicate an identical area warning label.
+const warning={id:'a',area:'Stara Zagora',title:'Wind',level:2,start:0,end:100};
+assert.equal(W.warningKey(warning),W.warningKey({...warning,id:'b'}));
+for(const change of [{area:'Plovdiv'},{title:'Fog'},{level:3},{start:10},{end:200},{description:'Different hazard detail'},{instruction:'Different instruction'}])assert.notEqual(W.warningKey(warning),W.warningKey({...warning,...change}));
+
+assert.equal(W.warningZoneKey(warning),W.warningZoneKey({...warning,id:'b',description:'Other details'}));
+assert.notEqual(W.warningZoneKey(warning),W.warningZoneKey({...warning,area:'Plovdiv'}));

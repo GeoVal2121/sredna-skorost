@@ -144,13 +144,16 @@
     var opened=popup;popup.on('close',function(){button.setAttribute('aria-expanded','false');if(popup===opened)popup=null;});
     var close=popup.getElement().querySelector('button');if(close)close.setAttribute('aria-label','Затвори прогнозата');
   }
-  var placeFilters=new Map(),placeStyle;
+  var placePaint=new Map(),placeStyle;
   function placeNames(names){
-    if(placeStyle!==map.style){placeStyle=map.style;placeFilters.clear();}
-    map.getStyle().layers.filter(function(l){return l.type==='symbol'&&l['source-layer']==='place';}).forEach(function(l){
-      if(!placeFilters.has(l.id))placeFilters.set(l.id,map.getFilter(l.id)||null);
-      var original=placeFilters.get(l.id),exclude=['!', ['in',['coalesce',['get','name:bg'],['get','name'],''],['literal',names]]];
-      map.setFilter(l.id,names.length?(original?['all',original,exclude]:exclude):original);
+    if(placeStyle!==map.style){placeStyle=map.style;placePaint.clear();}
+    map.getStyle().layers.filter(function(l){return l.type==='symbol'&&l['source-layer']==='place'&&l.id!=='place_continent';}).forEach(function(l){
+      if(!placePaint.has(l.id))placePaint.set(l.id,{opacity:map.getPaintProperty(l.id,'text-opacity'),transition:map.getPaintProperty(l.id,'text-opacity-transition')});
+      var original=placePaint.get(l.id);
+      // Paint hides the original immediately; filters leave fading copies during symbol placement.
+      var opacity=names.length?['case',['in',['coalesce',['get','name:bg'],['get','name'],''],['literal',names]],0,original.opacity===undefined?1:original.opacity]:original.opacity;
+      map.setPaintProperty(l.id,'text-opacity-transition',names.length?{duration:0,delay:0}:(original.transition||null));
+      if(JSON.stringify(map.getPaintProperty(l.id,'text-opacity'))!==JSON.stringify(opacity))map.setPaintProperty(l.id,'text-opacity',opacity===undefined?null:opacity);
     });
   }
   function settlePlaceLabels(){
@@ -175,12 +178,12 @@
     var placeFeatures=[];new Set(map.getStyle().layers.filter(function(l){return l['source-layer']==='place';}).map(function(l){return l.source;})).forEach(function(source){placeFeatures=placeFeatures.concat(map.querySourceFeatures(source,{sourceLayer:'place'}));});
     placeFeatures.forEach(function(f){
       var p=f.properties,name=p['name:bg']||p.name;
-      if(name&&f.geometry.type==='Point'&&['city','town','village','suburb','neighbourhood','hamlet'].includes(p.class))places.push({name:name,point:f.geometry.coordinates,rank:p.class==='city'?0:p.class==='town'?1:2});
+      if(name&&f.geometry.type==='Point'&&map.getZoom()>=({city:0,town:9,village:12,suburb:13,neighbourhood:13,hamlet:14}[p.class]??Infinity))places.push({name:name,point:f.geometry.coordinates,rank:p.class==='city'?0:p.class==='town'?1:2});
     });
     places.sort(function(a,b){return a.rank-b.rank||map.project(a.point).dist(map.project(center))-map.project(b.point).dist(map.project(center));});
-    // ponytail: at most 4 phone / 6 desktop labels; more places appear as the map moves.
+    // ponytail: at most 3 phone / 5 desktop forecasts; minor places appear only at local zoom.
     places.forEach(function(place){
-      if((place.rank>=3&&map.getZoom()>10&&markers.length)||(place.rank>=3&&Array.from(seen).some(function(name){return place.name==='Район '+name;}))||markers.length>=(box.width<600?4:6)||seen.has(place.name)||!bounds.contains(place.point))return;
+      if(markers.length>=(box.width<600?3:5)||seen.has(place.name)||!bounds.contains(place.point))return;
       var v=sample(data,h,place.point[0],place.point[1]);if(!v)return;
       var c=condition(data,h,place.point),temp=v[0]===null?'— °C':Math.round(v[0])+'°C';
       var el=document.createElement('button');el.type='button';el.className='weather-place-label';el.setAttribute('aria-expanded','false');el.setAttribute('aria-label',place.name+': '+c.text+', '+temp+'. Подробности за прогнозата');
@@ -204,7 +207,7 @@
         if(!coversName&&!overlaps&&r.left>=box.left+8&&r.right<=box.right-8&&r.top>=box.top+8&&r.bottom<=box.bottom-8){fits=true;break;}
       }
       if(!fits){marker.remove();return;}
-      marker.setOffset(offsets[i]);occupied.push(r);markers.push(marker);seen.add(place.name);
+      marker.setOffset(offsets[i]);occupied.push({left:r.left-24,right:r.right+24,top:r.top-24,bottom:r.bottom+24});markers.push(marker);seen.add(place.name);
     });
     placeNames(Array.from(seen));
   }

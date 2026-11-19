@@ -99,6 +99,12 @@
     });
     return {type:'FeatureCollection',features:features,unmapped:unmapped};
   }
+  function warningZoneKey(p) {
+    return JSON.stringify([p.area,p.title,p.level,p.start,p.end]);
+  }
+  function warningKey(p) {
+    return JSON.stringify([p.area,p.title,p.level,p.start,p.end,p.description,p.instruction]);
+  }
   function areaPoint(geometry) {
     var ring=geometry.type==='Polygon'?geometry.coordinates[0]:geometry.coordinates[0][0];
     var ys=ring.map(function(p){return p[1];}),y=(Math.min.apply(null,ys)+Math.max.apply(null,ys))/2,xs=[];
@@ -107,7 +113,7 @@
     for(var j=0;j+1<xs.length;j+=2)if(xs[j+1]-xs[j]>width){width=xs[j+1]-xs[j];point=[(xs[j]+xs[j+1])/2,y];}
     return point;
   }
-  var api = {areaPoint:areaPoint,hour:hour,tileURL:tileURL,feed:feed,parseAlert:parseAlert,combine:combine};
+  var api = {warningZoneKey:warningZoneKey,warningKey:warningKey,areaPoint:areaPoint,hour:hour,tileURL:tileURL,feed:feed,parseAlert:parseAlert,combine:combine};
   if (typeof module !== 'undefined') module.exports=api;
   root.SSWeather=api;
   if (typeof document === 'undefined') return;
@@ -149,20 +155,22 @@
     if (!map || !map.getSource('weather-warnings')) return;
     var data=sourceData();map.getSource('weather-warnings').setData(data);
     warningMarkers.forEach(function(m){m.remove();});warningMarkers=[];
-    if(enabled){var labeled=new Set();data.features.forEach(function(f){
-      var p=f.properties,key=p.id+':'+p.area;if(labeled.has(key))return;labeled.add(key);
+    if(enabled){var labeled=new Map();data.features.forEach(function(f){
+      var p=f.properties,key=warningZoneKey(p),existing=labeled.get(key);
+      var polygons=f.geometry.type==='Polygon'?[f.geometry.coordinates]:f.geometry.coordinates;
+      if(existing){existing.warningGeometry.coordinates.push.apply(existing.warningGeometry.coordinates,polygons);return;}
       var el=document.createElement('div');el.className='weather-warning-label';el.style.setProperty('--warning-color',p.color);
       var icon=document.createElement('span');icon.className='weather-warning-icon';icon.textContent='⚠';
       var text=document.createElement('span'),title=document.createElement('strong'),until=document.createElement('small');
       title.textContent=p.title+' · НИМХ';until.textContent=({2:'Жълт',3:'Оранжев',4:'Червен'}[p.level])+' код - до '+label(p.end).replace(/(\d{2}\.\d{2}),/,'$1.,');text.append(title,until);el.append(icon,text);
       el.title=p.title+' · '+p.area;el.setAttribute('aria-label',p.title+' · '+p.area+' · '+until.textContent);
-      var marker=new maplibregl.Marker({element:el,anchor:'center'}).setLngLat(areaPoint(f.geometry)).addTo(map);marker.warningGeometry=f.geometry;warningMarkers.push(marker);
+      var marker=new maplibregl.Marker({element:el,anchor:'center'}).setLngLat(areaPoint(f.geometry)).addTo(map);marker.warningGeometry={type:'MultiPolygon',coordinates:polygons.slice()};labeled.set(key,marker);warningMarkers.push(marker);
     });}
 
     positionWarnings();
     var list=$('weatherList');list.replaceChildren();var seen=new Set();
     data.features.map(function(f){return f.properties;}).concat(data.unmapped).forEach(function(p){
-      var k=p.id+':'+p.area;if(seen.has(k))return;seen.add(k);
+      var k=warningKey(p);if(seen.has(k))return;seen.add(k);
       var li=document.createElement('li'),details=document.createElement('details'),summary=document.createElement('summary');summary.textContent=p.title+' · '+p.area+' · '+({2:'жълт',3:'оранжев',4:'червен'}[p.level])+' код';details.append(summary);
       [label(p.start)+' – '+label(p.end),p.description,p.instruction].filter(Boolean).forEach(function(s){var line=document.createElement('p');line.textContent=s;details.append(line);});
       var source=document.createElement('a');source.href='https://weather.bg/obshtini/';source.target='_blank';source.rel='noopener';source.textContent='Официален източник: НИМХ';details.append(source);li.append(details);list.append(li);
