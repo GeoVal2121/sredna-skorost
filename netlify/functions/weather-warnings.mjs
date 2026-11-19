@@ -22,7 +22,8 @@ export default async function handler(request) {
     }
     return new Response(new Blob(chunks), { headers: {
       'Content-Type': 'application/xml; charset=utf-8',
-      'Cache-Control': 'public, max-age=60, s-maxage=300',
+      'Cache-Control': 'public, max-age=60',
+      'Netlify-CDN-Cache-Control': 'public, durable, max-age=300',
       'X-Content-Type-Options': 'nosniff'
     } });
   } catch {

@@ -1,26 +1,23 @@
 // Fixed regional grid: no route, device location, API key or arbitrary proxy URL.
 const grid = {west:22, south:41.1, step:0.3, cols:24, rows:12};
 const fields = ['temperature_2m','cloud_cover','precipitation','snowfall','wind_speed_10m','wind_direction_10m','weather_code','visibility','relative_humidity_2m'];
-let cached;
+let cached, pending;
 export default async function handler(request) {
   if (request.method !== 'GET') return new Response('Method not allowed',{status:405});
   if (new URL(request.url).search && !['?v=3','?v=4','?v=5'].includes(new URL(request.url).search)) return new Response('No parameters supported',{status:400});
   try {
     if (!cached || Date.now()-cached.generated>3600000) {
+      if(!pending)pending=(async()=>{
       const points=Array.from({length:grid.cols*grid.rows},(_,i)=>[
         (grid.south+Math.floor(i/grid.cols)*grid.step).toFixed(2),
         (grid.west+i%grid.cols*grid.step).toFixed(2)]);
-      const batches=await Promise.all([0,48,96,144,192,240].map(async start=>{
-        const batch=points.slice(start,start+48);
-        const url=new URL('https://api.open-meteo.com/v1/forecast');
-        url.search=new URLSearchParams({latitude:batch.map(p=>p[0]).join(','),longitude:batch.map(p=>p[1]).join(','),hourly:fields.join(','),models:'icon_eu',forecast_hours:'60',past_hours:'3',timezone:'GMT',timeformat:'unixtime',wind_speed_unit:'kmh'});
-        const r=await fetch(url,{signal:AbortSignal.timeout(20000),redirect:'error'});
-        if (!r.ok || !/json/i.test(r.headers.get('content-type')||'')) throw new Error('Unavailable');
-        const body=await r.json();
-        if (!Array.isArray(body) || body.length!==batch.length) throw new Error('Incomplete grid');
-        return body;
-      }));
-      const results=batches.flat(), times=results[0].hourly?.time;
+      const url=new URL('https://api.open-meteo.com/v1/forecast');
+      url.search=new URLSearchParams({latitude:points.map(p=>p[0]).join(','),longitude:points.map(p=>p[1]).join(','),hourly:fields.join(','),models:'icon_eu',forecast_hours:'60',past_hours:'3',timezone:'GMT',timeformat:'unixtime',wind_speed_unit:'kmh'});
+      const response=await fetch(url,{signal:AbortSignal.timeout(20000),redirect:'error'});
+      if(!response.ok||!/json/i.test(response.headers.get('content-type')||''))throw new Error('Upstream status '+response.status);
+      const results=await response.json();
+      if(!Array.isArray(results)||results.length!==points.length)throw new Error('Incomplete grid');
+      const times=results[0].hourly?.time;
       if (!Array.isArray(times) || times.length!==63 || times.some((t,i)=>!Number.isInteger(t)||i&&t-times[i-1]!==3600) || Math.abs(times[3]*1000-Date.now())>3600000) throw new Error('Invalid times');
       const cells=results.map(p=>{
         if (JSON.stringify(p.hourly?.time)!==JSON.stringify(times)) throw new Error('Mismatched hours');
@@ -37,10 +34,14 @@ export default async function handler(request) {
         values[5]=speed.map((v,i)=>v===null||direction[i]===null?null:Math.round(-v*Math.cos(direction[i]*Math.PI/180)*100)/100);
         return values;
       });
-      cached={grid,times,cells,model:'icon_eu',windComponents:'towards-east-north-kmh',generated:Date.now()};
+      return {grid,times,cells,model:'icon_eu',windComponents:'towards-east-north-kmh',generated:Date.now()};
+      })().finally(()=>{pending=undefined;});
+      cached=await pending;
     }
-    return Response.json(cached,{headers:{'Cache-Control':'public, max-age=300, s-maxage=3600','X-Content-Type-Options':'nosniff'}});
-  } catch {
+    const ttl=Math.max(1,Math.floor((cached.generated+3600000-Date.now())/1000));
+    return Response.json(cached,{headers:{'Cache-Control':'public, max-age='+Math.min(60,ttl),'Netlify-CDN-Cache-Control':'public, durable, max-age='+ttl,'X-Content-Type-Options':'nosniff'}});
+  } catch(error) {
+    console.warn('Regional forecast refresh failed:',error.name,error.message);
     return new Response('Regional forecast unavailable',{status:502,headers:{'Cache-Control':'no-store'}});
   }
 }

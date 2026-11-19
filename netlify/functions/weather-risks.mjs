@@ -33,6 +33,7 @@ export default async function handler(request){
    })());
    try{await pending.get(key);}finally{pending.delete(key);}
   }
-  return Response.json({schema:1,models,municipalities:ids.map(id=>cache.get(id))},{headers:{'Cache-Control':'public, max-age=300, s-maxage=3600','X-Content-Type-Options':'nosniff'}});
+  const ttl=Math.max(1,Math.floor((Math.min(...ids.map(id=>cache.get(id).generated))+3600000-Date.now())/1000));
+  return Response.json({schema:1,models,municipalities:ids.map(id=>cache.get(id))},{headers:{'Cache-Control':'public, max-age='+Math.min(60,ttl),'Netlify-CDN-Cache-Control':'public, durable, max-age='+ttl,'X-Content-Type-Options':'nosniff'}});
  }catch{return new Response('Local hazard forecast unavailable',{status:502,headers:{'Cache-Control':'no-store'}});}
 }

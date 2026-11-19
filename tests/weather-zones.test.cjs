@@ -14,16 +14,19 @@ test('fixed forecast endpoint validates upstream, hours and caches complete grid
   const req=new Request('https://local/.netlify/functions/weather-zones');
   assert.equal((await handler(new Request(req.url+'?url=https://evil'))).status,400);
   assert.equal((await handler(new Request(req.url,{method:'POST'}))).status,405);
-  let calls=0,bad=true;
+  let calls=0,bad=true,active=0,peak=0;
   global.fetch=async url=>{
-    calls++;assert.equal(url.hostname,'api.open-meteo.com');assert.equal(url.searchParams.get('models'),'icon_eu');assert.equal(url.searchParams.get('latitude').split(',').length,48);
+    calls++;active++;peak=Math.max(peak,active);await new Promise(r=>setTimeout(r,5));active--;assert.equal(url.hostname,'api.open-meteo.com');assert.equal(url.searchParams.get('models'),'icon_eu');assert.equal(url.searchParams.get('latitude').split(',').length,288);
     const time=Array.from({length:63},(_,i)=>Math.floor(Date.now()/3600000)*3600+(i-3)*3600);
-    return Response.json(Array.from({length:48},()=>({hourly:{time,temperature_2m:time.map(()=>bad?'wrong':2),cloud_cover:time.map(()=>80),precipitation:time.map(()=>.6),snowfall:time.map(()=>0),wind_speed_10m:time.map(()=>25),wind_direction_10m:time.map(()=>225),weather_code:time.map(()=>61),visibility:time.map(()=>20000),relative_humidity_2m:time.map(()=>90)}})));
+    return Response.json(Array.from({length:288},()=>({hourly:{time,temperature_2m:time.map(()=>bad?'wrong':2),cloud_cover:time.map(()=>80),precipitation:time.map(()=>.6),snowfall:time.map(()=>0),wind_speed_10m:time.map(()=>25),wind_direction_10m:time.map(()=>225),weather_code:time.map(()=>61),visibility:time.map(()=>20000),relative_humidity_2m:time.map(()=>90)}})));
   };
   try{
     assert.equal((await handler(req)).status,502);bad=false;
-    const r=await handler(req);assert.equal(r.status,200);const d=await r.json();assert.equal(d.cells.length,288);assert.equal(d.times.length,63);assert.equal(d.windComponents,'towards-east-north-kmh');assert(Math.abs(windAt(d,0,24,42).speed-25)<.008);assert(Math.abs(windAt(d,0,24,42).towards-45)<1e-8);
-    const n=calls;await handler(req);assert.equal(calls,n,'warm cache avoids repeated multi-location requests');
+    const before=calls,responses=await Promise.all(Array.from({length:25},()=>handler(req))),r=responses[0];
+    assert.equal(calls-before,1,'25 concurrent clients share one upstream request');assert.equal(peak,1,'one upstream request');
+    assert(responses.every(r=>r.status===200));assert.match(r.headers.get('Netlify-CDN-Cache-Control'),/public, durable, max-age=/);
+    const d=await r.json();assert.equal(d.cells.length,288);assert.equal(d.times.length,63);assert.equal(d.windComponents,'towards-east-north-kmh');assert(Math.abs(windAt(d,0,24,42).speed-25)<.008);assert(Math.abs(windAt(d,0,24,42).towards-45)<1e-8);
+    const n=calls;const originalNow=Date.now;Date.now=()=>d.generated+1800000;try{const warm=await handler(req);assert.match(warm.headers.get('Netlify-CDN-Cache-Control'),/max-age=1800$/,'remaining TTL must not reset the age');}finally{Date.now=originalNow;}assert.equal(calls,n,'warm cache avoids repeated multi-location requests');
   }finally{global.fetch=original;}
 });
 
@@ -112,4 +115,14 @@ test('overview condition changes with forecast hour: sun, partial cloud, cloud, 
  const fields=[[17,16,15,12,0],[0,40,90,90,90],[0,0,0,1,1],[0,0,0,0,.2],[0,0,0,0,0],[0,0,0,0,0],[0,2,3,61,73]];
  const d={grid:{west:22,south:41,cols:2,rows:2,step:1},cells:Array.from({length:4},()=>fields)};
  assert.deepEqual([0,1,2,3,4].map(h=>condition(d,h,[22.5,41.5]).icon),['sun','partly-cloudy','cloud','cloud-rain','snowflake']);
+});
+
+
+test('hourly warmer uses the canonical shared route and rejects failed refreshes',async()=>{
+ const {default:warm,config}=await import('../netlify/functions/weather-cache-warm.mjs');
+ assert.equal(config.schedule,'7 * * * *');const original=global.fetch;
+ try{global.fetch=async url=>{assert.equal(url,'https://sredna-skorost.netlify.app/.netlify/functions/weather-zones?v=5');return Response.json({generated:Date.now()});};await warm();
+ global.fetch=async()=>new Response('Unavailable',{status:502});await assert.rejects(warm(),/502/);
+ global.fetch=async()=>Response.json({generated:Date.now()-7200000});await assert.rejects(warm(),/not fresh/);
+ }finally{global.fetch=original;}
 });
