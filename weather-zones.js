@@ -156,7 +156,7 @@
       windMarkers.push(new maplibregl.Marker({element:el,rotation:w.towards,rotationAlignment:'map'}).setLngLat(point).addTo(map));
     }
   }
-  var placesDirty=false;
+  var placesDirty=false,markerTime;
   function settlePlaceLabels(){
     if(!active||!markers.length||map.isMoving())return;
     var box=map.getContainer().getBoundingClientRect(),layers=map.getStyle().layers.filter(function(l){return l.type==='symbol'&&l['source-layer']==='place';}).map(function(l){return l.id;});
@@ -167,13 +167,15 @@
       if(collision)marker.remove();return !collision;
     });
     markers=kept;
+    if(!markers.length)zoneMarkers(markerTime,true);
   }
-  function zoneMarkers(t){
+  function zoneMarkers(t,regionalOnly){
+    markerTime=typeof t==='number'?t:time;
     var dock=document.getElementById("streetForecast");dock.replaceChildren();
     placesDirty=false;closeDetails();markers.forEach(function(m){m.remove();});markers=[];
-    var h=data?data.times.indexOf((typeof t==='number'?t:time)/1000):-1;if(!map.getStyle())return;drawWind(h);if(!active||h<0)return;
+    var h=data?data.times.indexOf(markerTime/1000):-1;if(!map.getStyle())return;drawWind(h);if(!active||h<0)return;
     var box=map.getContainer().getBoundingClientRect(),occupied=[],seen=new Set(),center=map.getCenter(),bounds=map.getBounds();
-    var obstacles=Array.from(document.querySelectorAll('.top,.chips,.side,.spdw,.maplibregl-ctrl,#weatherPanel,#bottomBar,.weather-warning-label,.weather-risk-label')).map(function(e){return e.getBoundingClientRect();}).filter(function(r){return r.width&&r.height;});
+    var obstacles=Array.from(document.querySelectorAll('.top,.chips,.side,#shareBtn,.spdw,.maplibregl-ctrl,#weatherPanel,#bottomBar,.weather-warning-label,.weather-risk-label')).map(function(e){return e.getBoundingClientRect();}).filter(function(r){return r.width&&r.height;});
     var places=[];
     // Only attach weather to settlements whose native map labels are currently displayed.
     var placeLayers=map.getStyle().layers.filter(function(l){return l.type==='symbol'&&l['source-layer']==='place';}).map(function(l){return l.id;});
@@ -183,11 +185,12 @@
       if(name&&f.geometry.type==='Point'&&map.getZoom()>=({city:0,town:9,village:12,suburb:13,neighbourhood:13,hamlet:14}[p.class]??Infinity))places.push({name:name,point:f.geometry.coordinates,rank:p.class==='city'?0:p.class==='town'?1:2});
     });
     places.sort(function(a,b){return a.rank-b.rank||map.project(a.point).dist(map.project(center))-map.project(b.point).dist(map.project(center));});
-    var street=api.streetView;
-    if(street)places=[{name:'Прогноза за района',point:[center.lng,center.lat]}];
+    if(api.streetView||regionalOnly)places=[];
+    places.push({name:'Прогноза за района',point:[center.lng,center.lat],regional:true});
     // ponytail: at most 3 phone / 5 desktop forecasts; minor places appear only at local zoom.
     places.forEach(function(place){
 
+      if(place.regional&&markers.length)return;
       if(markers.length>=(box.width<600?3:5)||seen.has(place.name)||!bounds.contains(place.point))return;
       var v=sample(data,h,place.point[0],place.point[1]);if(!v)return;
       var c=condition(data,h,place.point),temp=v[0]===null?'— °C':Math.round(v[0])+'°C';
@@ -200,7 +203,7 @@
       // Precipitation view matches the approved icon + temperature map labels.
       el.setAttribute('aria-label',place.name+': '+(mode==='overview'?c.text+', ':'')+value.textContent+'. Подробности за прогнозата');el.append(symbol,value);
       el.onclick=function(e){e.stopPropagation();details(place,h,el);};
-      if(street){dock.append(el);return;}
+      if(place.regional){dock.append(el);return;}
       var marker=new maplibregl.Marker({element:el,anchor:'center'}).setLngLat(place.point).addTo(map),r=el.getBoundingClientRect(),anchor=map.project(place.point),width=r.width,height=r.height;
       var offsets=[[0,40],[0,-32],[64,0],[-64,0],[0,56],[0,-56]],fits=false;
       for(var i=0;i<offsets.length;i++){
