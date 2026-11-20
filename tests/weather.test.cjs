@@ -36,3 +36,6 @@ for(const change of [{area:'Plovdiv'},{title:'Fog'},{level:3},{start:10},{end:20
 
 assert.equal(W.warningZoneKey(warning),W.warningZoneKey({...warning,id:'b',description:'Other details'}));
 assert.notEqual(W.warningZoneKey(warning),W.warningZoneKey({...warning,area:'Plovdiv'}));
+
+assert.equal(W.warningDisplayKey(warning),W.warningDisplayKey({...warning,area:'Ruse',id:'b'}));
+for(const change of [{title:'Fog'},{level:3},{start:10},{end:200}])assert.notEqual(W.warningDisplayKey(warning),W.warningDisplayKey({...warning,...change}));

@@ -102,6 +102,7 @@
   function warningZoneKey(p) {
     return JSON.stringify([p.area,p.title,p.level,p.start,p.end]);
   }
+  function warningDisplayKey(p) { return JSON.stringify([p.title,p.level,p.start,p.end]); }
   function warningKey(p) {
     return JSON.stringify([p.area,p.title,p.level,p.start,p.end,p.description,p.instruction]);
   }
@@ -113,7 +114,7 @@
     for(var j=0;j+1<xs.length;j+=2)if(xs[j+1]-xs[j]>width){width=xs[j+1]-xs[j];point=[(xs[j]+xs[j+1])/2,y];}
     return point;
   }
-  var api = {warningZoneKey:warningZoneKey,warningKey:warningKey,areaPoint:areaPoint,hour:hour,tileURL:tileURL,feed:feed,parseAlert:parseAlert,combine:combine};
+  var api = {warningDisplayKey:warningDisplayKey,warningZoneKey:warningZoneKey,warningKey:warningKey,areaPoint:areaPoint,hour:hour,tileURL:tileURL,feed:feed,parseAlert:parseAlert,combine:combine};
   if (typeof module !== 'undefined') module.exports=api;
   root.SSWeather=api;
   if (typeof document === 'undefined') return;
@@ -133,12 +134,25 @@
     return json ? r.json() : r.text();
   }
   function sourceData() { return fetched && Date.now()-fetched < 900000 ? combine(alerts,selected) : {type:'FeatureCollection',features:[],unmapped:[]}; }
+  var warningLayoutDirty=false;
+  function scheduleWarnings(){warningLayoutDirty=true;map.triggerRepaint();}
   function positionWarnings() {
+    var dock=$('streetWarnings');dock.replaceChildren();
     if(!enabled||!root.SSWeatherZones)return;
+    if(map.getZoom()>=SSWeatherZones.streetZoom){
+      var center=map.getCenter();
+      warningMarkers.forEach(function(marker){
+        var el=marker.getElement();el.style.visibility='hidden';el.setAttribute('aria-hidden','true');
+        if(!SSWeatherZones.contains(marker.warningGeometry,[center.lng,center.lat]))return;
+        var row=document.createElement('div');row.className='street-warning';row.style.setProperty('--warning-color',el.style.getPropertyValue('--warning-color'));
+        Array.from(el.children).forEach(function(child){row.append(child.cloneNode(true));});dock.append(row);
+      });
+      return;
+    }
     var box=map.getContainer().getBoundingClientRect(),obstacles=Array.from(document.querySelectorAll('.top,.chips,.side,.spdw,.maplibregl-ctrl,#weatherPanel,#bottomBar')).map(function(e){return e.getBoundingClientRect();}).filter(function(r){return r.width&&r.height;});
     warningMarkers.forEach(function(m){
-      var el=m.getElement(),candidates=[areaPoint(m.warningGeometry)],fits=false,fallback=null;el.style.visibility='hidden';
-      [.5,.35,.65,.2,.8,.1,.9].forEach(function(y){[.5,.35,.65,.2,.8,.1,.9].forEach(function(x){var ll=map.unproject([box.width*x,box.height*y]);candidates.push([ll.lng,ll.lat]);});});
+      var at=m.getLngLat(),el=m.getElement(),candidates=[[at.lng,at.lat],areaPoint(m.warningGeometry)],fits=false,fallback=null;el.style.visibility='hidden';
+      [.5,.4,.6,.3,.7,.2,.8,.1,.9].forEach(function(y){[.5,.4,.6,.3,.7,.2,.8,.1,.9].forEach(function(x){var ll=map.unproject([box.width*x,box.height*y]);candidates.push([ll.lng,ll.lat]);});});
       for(var n=0;n<candidates.length;n++){
         if(!map.getBounds().contains(candidates[n])||!SSWeatherZones.contains(m.warningGeometry,candidates[n]))continue;
         var size=el.getBoundingClientRect(),screen=map.project(candidates[n]),r={left:box.left+screen.x-size.width/2,right:box.left+screen.x+size.width/2,top:box.top+screen.y-size.height/2,bottom:box.top+screen.y+size.height/2};
@@ -146,7 +160,7 @@
         var names=map.getStyle().layers.filter(function(l){return l.type==='symbol'&&l['source-layer']==='place';}).map(function(l){return l.id;});
         if(names.length&&map.queryRenderedFeatures([[r.left-box.left-4,r.top-box.top-4],[r.right-box.left+4,r.bottom-box.top+4]],{layers:names}).length)continue;
         if(!fallback)fallback={point:candidates[n],rect:r};
-        if(![[r.left,r.top],[r.right,r.top],[r.right,r.bottom],[r.left,r.bottom]].every(function(p){var ll=map.unproject([p[0]-box.left,p[1]-box.top]);return SSWeatherZones.contains(m.warningGeometry,[ll.lng,ll.lat]);}))continue;
+        if(n!==0&&![[r.left,r.top],[r.right,r.top],[r.right,r.bottom],[r.left,r.bottom]].every(function(p){var ll=map.unproject([p[0]-box.left,p[1]-box.top]);return SSWeatherZones.contains(m.warningGeometry,[ll.lng,ll.lat]);}))continue;
         fits=true;m.setLngLat(candidates[n]);el.style.visibility='visible';obstacles.push(r);break;
       }
       if(!fits&&fallback){m.setLngLat(fallback.point);fits=true;el.style.visibility='visible';obstacles.push(fallback.rect);}
@@ -156,20 +170,24 @@
   function updateWarnings() {
     if (!map || !map.getSource('weather-warnings')) return;
     var data=sourceData();map.getSource('weather-warnings').setData(data);
-    warningMarkers.forEach(function(m){m.remove();});warningMarkers=[];
+    var previous=new Map(warningMarkers.map(function(m){return [m.warningKey,m];}));warningMarkers=[];
     if(enabled){var labeled=new Map();data.features.forEach(function(f){
-      var p=f.properties,key=warningZoneKey(p),existing=labeled.get(key);
+      var p=f.properties,key=warningDisplayKey(p),existing=labeled.get(key);
       var polygons=f.geometry.type==='Polygon'?[f.geometry.coordinates]:f.geometry.coordinates;
-      if(existing){existing.warningGeometry.coordinates.push.apply(existing.warningGeometry.coordinates,polygons);return;}
+      if(existing){existing.warningGeometry.coordinates.push.apply(existing.warningGeometry.coordinates,polygons);existing.warningAreas.add(p.area);return;}
+      var reused=previous.get(key);
+      if(reused){previous.delete(key);reused.warningAreas=new Set([p.area]);reused.warningGeometry={type:'MultiPolygon',coordinates:polygons.slice()};labeled.set(key,reused);warningMarkers.push(reused);return;}
       var el=document.createElement('div');el.className='weather-warning-label';el.style.setProperty('--warning-color',p.color);
       var icon=document.createElement('span');icon.className='weather-warning-icon';icon.textContent='⚠';
       var text=document.createElement('span'),title=document.createElement('strong'),until=document.createElement('small');
       title.textContent=p.title+' · НИМХ';until.textContent=({2:'Жълт',3:'Оранжев',4:'Червен'}[p.level])+' код - до '+label(p.end).replace(/(\d{2}\.\d{2}),/,'$1.,');text.append(title,until);el.append(icon,text);
       el.title=p.title+' · '+p.area;el.setAttribute('aria-label',p.title+' · '+p.area+' · '+until.textContent);
-      var marker=new maplibregl.Marker({element:el,anchor:'center'}).setLngLat(areaPoint(f.geometry)).addTo(map);marker.warningGeometry={type:'MultiPolygon',coordinates:polygons.slice()};labeled.set(key,marker);warningMarkers.push(marker);
+      var marker=new maplibregl.Marker({element:el,anchor:'center'}).setLngLat(areaPoint(f.geometry)).addTo(map);marker.warningKey=key;marker.warningAreas=new Set([p.area]);marker.warningGeometry={type:'MultiPolygon',coordinates:polygons.slice()};labeled.set(key,marker);warningMarkers.push(marker);
     });}
 
-    positionWarnings();
+    warningMarkers.forEach(function(m){var el=m.getElement(),areas=Array.from(m.warningAreas).join(', ');el.title=areas;el.setAttribute('aria-label',el.textContent+' · '+areas);});
+    previous.forEach(function(m){m.remove();});
+    scheduleWarnings();
     var list=$('weatherList');list.replaceChildren();var seen=new Set();
     data.features.map(function(f){return f.properties;}).concat(data.unmapped).forEach(function(p){
       var k=warningKey(p);if(seen.has(k))return;seen.add(k);
@@ -265,9 +283,8 @@
     map.on('style.load',function(){labelPaint={};if(enabled)style();});
     map.on('error',function(e){if(enabled && mode==='precip' && e.sourceId==='weather-forecast'){tileFailed=true;badge();$('weatherStatus').textContent='Прогнозният слой не е достъпен за този час.';}});
     map.on('sourcedata',function(e){if(enabled && mode==='precip' && e.sourceId==='weather-forecast' && e.isSourceLoaded && !tileFailed)$('weatherStatus').textContent='Прогнозен модел · обща картина, не точност по улици';});
-    var warningFrame=0;
-    map.on('move',function(){if(enabled&&!warningFrame)warningFrame=requestAnimationFrame(function(){warningFrame=0;positionWarnings();});});
-    map.on('moveend',positionWarnings);map.on('resize',positionWarnings);
+    map.on('moveend',scheduleWarnings);map.on('resize',scheduleWarnings);
+    map.on('idle',function(){if(warningLayoutDirty){warningLayoutDirty=false;positionWarnings();}});
     $('weatherToggle').onclick=function(){if(!enabled)choose('overview');else menu($('weatherMenu').hidden);};$('weatherClose').onclick=function(){choose('off');};
     document.querySelectorAll('#weatherMenu [data-layer]').forEach(function(b){b.onclick=function(){choose(b.dataset.layer);};});
     document.addEventListener('pointerdown',function(e){if(!$('weatherMenu').contains(e.target)&&!$('weatherToggle').contains(e.target))menu(false);});

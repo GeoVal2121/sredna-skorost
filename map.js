@@ -197,6 +197,17 @@
         paint: { "text-color": isDark ? "#ff8a80" : "#d93025", "text-halo-color": isDark ? "#26314f" : "#fff", "text-halo-width": 1.8 } });
       map.addSource("measure", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
       map.addLayer({ id: "measure", type: "line", source: "measure", paint: { "line-color": "#7c3aed", "line-width": 6, "line-opacity": 0.85, "line-offset": ["interpolate", ["linear"], ["zoom"], 12, 0, 16, ["*", ["get", "shared"], 3]] } });
+      // Draw opaque buildings over ground-level roads, routes and street lettering.
+      map.moveLayer("measure", below);
+      var layers = map.getStyle().layers;
+      var lastStreet = layers.reduce(function(last, layer, index) {
+        return layer.id === "measure" || layer["source-layer"] === "transportation_name" ? index : last;
+      }, -1);
+      var next = layers.slice(lastStreet + 1).find(function(layer) { return layer.type !== "fill-extrusion"; });
+      layers.filter(function(layer) { return layer.type === "fill-extrusion" && layer["source-layer"] === "building"; }).forEach(function(layer) {
+        map.setPaintProperty(layer.id, "fill-extrusion-opacity", 1);
+        map.moveLayer(layer.id, next && next.id);
+      });
       map.addLayer({ id: "pts-hit", type: "circle", source: "pts", paint: { "circle-radius": 22, "circle-opacity": 0 } });
       map.addLayer({ id: "pts", type: "circle", source: "pts",
         paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 6, 4, 12, 8, 16, 11], "circle-color": ["get", "col"],

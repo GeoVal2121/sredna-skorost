@@ -80,7 +80,7 @@
     });
     return {type:'FeatureCollection',features:features};
   }
-  var api={sample:sample,windAt:windAt,thermometer:thermometer,conditions:conditions,condition:condition,contains:contains,riskZones:riskZones,riskCandidates:riskCandidates,fogSignal:fogSignal,hazardSignal:hazardSignal};root.SSWeatherZones=api;if(typeof module!=='undefined')module.exports=api;
+  var api={streetZoom:14,sample:sample,windAt:windAt,thermometer:thermometer,conditions:conditions,condition:condition,contains:contains,riskZones:riskZones,riskCandidates:riskCandidates,fogSignal:fogSignal,hazardSignal:hazardSignal};root.SSWeatherZones=api;if(typeof module!=='undefined')module.exports=api;
   if(typeof document==='undefined')return;
   var map,data,pending,active=false,time=0,mode="overview";
   var $=function(id){return document.getElementById(id);};
@@ -144,6 +144,18 @@
     var opened=popup;popup.on('close',function(){button.setAttribute('aria-expanded','false');if(popup===opened)popup=null;});
     var close=popup.getElement().querySelector('button');if(close)close.setAttribute('aria-label','Затвори прогнозата');
   }
+  var windMarkers=[];
+  function drawWind(h){
+    windMarkers.forEach(function(m){m.remove();});windMarkers=[];
+    if(!active||mode!=='wind'||h<0)return;
+    var box=map.getContainer().getBoundingClientRect();
+    // ponytail: sparse direction arrows, not a dense particle simulation.
+    for(var y=200;y<box.height-170;y+=140)for(var x=65;x<box.width-60;x+=140){
+      var point=map.unproject([x,y]),w=windAt(data,h,point.lng,point.lat);if(!w||w.speed<.5)continue;
+      var el=document.createElement('div');el.className='weather-wind-arrow';el.setAttribute('aria-hidden','true');el.append(icon('arrow-up'));
+      windMarkers.push(new maplibregl.Marker({element:el,rotation:w.towards,rotationAlignment:'map'}).setLngLat(point).addTo(map));
+    }
+  }
   var placesDirty=false;
   function settlePlaceLabels(){
     if(!active||!markers.length||map.isMoving())return;
@@ -157,8 +169,9 @@
     markers=kept;
   }
   function zoneMarkers(t){
+    var dock=document.getElementById("streetForecast");dock.replaceChildren();
     placesDirty=false;closeDetails();markers.forEach(function(m){m.remove();});markers=[];
-    var h=data?data.times.indexOf((typeof t==='number'?t:time)/1000):-1;if(!map.getStyle())return;if(!active||h<0)return;
+    var h=data?data.times.indexOf((typeof t==='number'?t:time)/1000):-1;if(!map.getStyle())return;drawWind(h);if(!active||h<0)return;
     var box=map.getContainer().getBoundingClientRect(),occupied=[],seen=new Set(),center=map.getCenter(),bounds=map.getBounds();
     var obstacles=Array.from(document.querySelectorAll('.top,.chips,.side,.spdw,.maplibregl-ctrl,#weatherPanel,#bottomBar,.weather-warning-label,.weather-risk-label')).map(function(e){return e.getBoundingClientRect();}).filter(function(r){return r.width&&r.height;});
     var places=[];
@@ -170,8 +183,11 @@
       if(name&&f.geometry.type==='Point'&&map.getZoom()>=({city:0,town:9,village:12,suburb:13,neighbourhood:13,hamlet:14}[p.class]??Infinity))places.push({name:name,point:f.geometry.coordinates,rank:p.class==='city'?0:p.class==='town'?1:2});
     });
     places.sort(function(a,b){return a.rank-b.rank||map.project(a.point).dist(map.project(center))-map.project(b.point).dist(map.project(center));});
+    var street=map.getZoom()>=api.streetZoom;
+    if(street)places=[{name:'Прогноза за района',point:[center.lng,center.lat]}];
     // ponytail: at most 3 phone / 5 desktop forecasts; minor places appear only at local zoom.
     places.forEach(function(place){
+
       if(markers.length>=(box.width<600?3:5)||seen.has(place.name)||!bounds.contains(place.point))return;
       var v=sample(data,h,place.point[0],place.point[1]);if(!v)return;
       var c=condition(data,h,place.point),temp=v[0]===null?'— °C':Math.round(v[0])+'°C';
@@ -184,6 +200,7 @@
       // Precipitation view matches the approved icon + temperature map labels.
       el.setAttribute('aria-label',place.name+': '+(mode==='overview'?c.text+', ':'')+value.textContent+'. Подробности за прогнозата');el.append(symbol,value);
       el.onclick=function(e){e.stopPropagation();details(place,h,el);};
+      if(street){dock.append(el);return;}
       var marker=new maplibregl.Marker({element:el,anchor:'center'}).setLngLat(place.point).addTo(map),r=el.getBoundingClientRect(),anchor=map.project(place.point),width=r.width,height=r.height;
       var offsets=[[0,40],[0,-32],[64,0],[-64,0],[0,56],[0,-56]],fits=false;
       for(var i=0;i<offsets.length;i++){
@@ -214,7 +231,18 @@
       ['fog','ice'].forEach(function(kind){map.addLayer({id:'weather-risk-'+kind,type:'line',source:'weather-risks',filter:['==','kind',kind],paint:{'line-color':kind==='ice'?'#168ed0':'#e5b000','line-width':1.75,'line-opacity':.9,'line-blur':.25}},before?before.id:'route');});
     }else if(map.getSource('weather-risks')&&riskRenderedFeatures!==fc)map.getSource('weather-risks').setData(fc);
     riskRenderedSource=map.getSource('weather-risks');riskRenderedFeatures=fc;riskRenderedView=view;
+    var riskDock=document.getElementById('streetRisks');riskDock.replaceChildren();
+    var riskKinds=new Set();
     (fc.features||[]).forEach(function(f){
+      if(map.getZoom()>=api.streetZoom){
+        var point=[center.lng,center.lat],kind=f.properties.kind;
+        if(!riskKinds.has(kind)&&contains(f.geometry,point)){
+          riskKinds.add(kind);var button=document.createElement('button');button.className='weather-risk-label '+kind;
+          button.append(icon(kind==='ice'?'snowflake':'mist'),kind==='ice'?'Риск от заледяване':'Възможна мъгла');
+          button.onclick=function(){riskDetails(f,point);};riskDock.append(button);
+        }
+        return;
+      }
       var bounds=map.getBounds(),b=f.properties.bbox;
       if(b&&(b[2]<bounds.getWest()||b[0]>bounds.getEast()||b[3]<bounds.getSouth()||b[1]>bounds.getNorth()))return;
       if(b){var corners=[[b[0],b[1]],[b[2],b[1]],[b[2],b[3]],[b[0],b[3]]].map(function(p){return map.project(p);});if(Math.max.apply(null,corners.map(function(p){return p.x;}))-Math.min.apply(null,corners.map(function(p){return p.x;}))<65||Math.max.apply(null,corners.map(function(p){return p.y;}))-Math.min.apply(null,corners.map(function(p){return p.y;}))<24)return;}
