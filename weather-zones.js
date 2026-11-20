@@ -183,7 +183,7 @@
       if(name&&f.geometry.type==='Point'&&map.getZoom()>=({city:0,town:9,village:12,suburb:13,neighbourhood:13,hamlet:14}[p.class]??Infinity))places.push({name:name,point:f.geometry.coordinates,rank:p.class==='city'?0:p.class==='town'?1:2});
     });
     places.sort(function(a,b){return a.rank-b.rank||map.project(a.point).dist(map.project(center))-map.project(b.point).dist(map.project(center));});
-    var street=map.getZoom()>=api.streetZoom;
+    var street=api.streetView;
     if(street)places=[{name:'Прогноза за района',point:[center.lng,center.lat]}];
     // ponytail: at most 3 phone / 5 desktop forecasts; minor places appear only at local zoom.
     places.forEach(function(place){
@@ -234,7 +234,7 @@
     var riskDock=document.getElementById('streetRisks');riskDock.replaceChildren();
     var riskKinds=new Set();
     (fc.features||[]).forEach(function(f){
-      if(map.getZoom()>=api.streetZoom){
+      if(api.streetView){
         var point=[center.lng,center.lat],kind=f.properties.kind;
         if(!riskKinds.has(kind)&&contains(f.geometry,point)){
           riskKinds.add(kind);var button=document.createElement('button');button.className='weather-risk-label '+kind;
@@ -276,7 +276,22 @@
     if(active&&data)status(h>=0?'Open-Meteo · ICON-EU за общия слой (~25 км). Рисковете се проверяват отделно в 3 вътрешни точки с ICON-EU и GFS. Общинският контур не е точната граница на явлението. Липсата на зона не изключва локална мъгла или поледица.':'Няма данни за зоните за този час.',h<0);
   }
   function status(message,failed){document.getElementById('weatherZoneStatus').textContent=message+(municipalityFailed?' Общинските граници са недостъпни; рисковите зони не се показват.':'')+(evidenceBusy?' Проверка на местните рискове…':'')+(evidenceFailed?' Част от местните проверки са недостъпни; липсата на зона не означава безопасни условия.':'');api.failed=failed||municipalityFailed||evidenceFailed;if(api.onstatus)api.onstatus();}
-  api.mount=function(m){map=m;map.on('idle',function(){if(placesDirty){zoneMarkers();return;}settlePlaceLabels();});map.on('moveend',function(){drawRisks(data?data.times.indexOf(time/1000):-1);placesDirty=true;loadRiskEvidence();});map.on('resize',function(){drawRisks(data?data.times.indexOf(time/1000):-1);placesDirty=true;loadRiskEvidence();});map.on('style.load',function(){if(active)render();});
+  function syncForecastZoom(){
+    var zoom=map.getZoom(),threshold=api.streetZoom;
+    var wasStreet=!!api.streetView;
+    api.streetView=active && zoom >= threshold-(wasStreet ? .2 : 0);
+    var size=Math.max(22,Math.min(42,22+(zoom-10)*10/3));
+    document.body.style.setProperty('--forecast-icon-size',size+'px');
+    document.body.style.setProperty('--place-opacity',Math.max(0,Math.min(1,(threshold-zoom)/.6)));
+    document.body.style.setProperty('--dock-opacity',Math.max(0,Math.min(1,(zoom-threshold+.2)/.2)));
+    if(wasStreet!==api.streetView){
+      document.body.classList.toggle('street-view',api.streetView);
+      zoneMarkers();
+      drawRisks(data?data.times.indexOf(time/1000):-1);
+      if(api.onStreetChange)api.onStreetChange();
+    }
+  }
+  api.mount=function(m){map=m;map.on('zoom',syncForecastZoom);map.on('idle',function(){if(placesDirty){zoneMarkers();return;}settlePlaceLabels();});map.on('moveend',function(){drawRisks(data?data.times.indexOf(time/1000):-1);placesDirty=true;loadRiskEvidence();});map.on('resize',function(){drawRisks(data?data.times.indexOf(time/1000):-1);placesDirty=true;loadRiskEvidence();});map.on('style.load',function(){if(active)render();});
     map.on('click',function(e){
       if(!active||!map.getLayer('weather-risk-fill')||e.originalEvent&&e.originalEvent.target.closest('.weather-risk-label,.weather-place-label,.weather-warning-label'))return;
       var priority=['weather-warning-fill','pts-hit','secs','secs-up','cams'].filter(function(id){return !!map.getLayer(id);});if(priority.length&&map.queryRenderedFeatures(e.point,{layers:priority}).length)return;
@@ -285,7 +300,7 @@
     map.on('sourcedata',function(e){if(active&&e.sourceId==='openmaptiles'&&e.sourceDataType==='content')placesDirty=true;});};
   api.preview=function(t){zoneMarkers(t);};
   api.show=function(enabled,t,nextMode){
-    active=enabled;time=t;if(nextMode)mode=nextMode;
+    active=enabled;time=t;if(nextMode)mode=nextMode;syncForecastZoom();
     if(data&&Date.now()-data.generated>7200000)data=null;
     if(active&&!municipalities&&!municipalitiesPending)municipalitiesPending=fetch('weather-municipalities.geojson',{signal:AbortSignal.timeout(15000)}).then(function(r){if(!r.ok)throw new Error('Municipalities unavailable');return r.json();}).then(function(d){
       if(d.type!=='FeatureCollection'||!d.grid||!Array.isArray(d.features)||d.features.length!==265||d.features.some(function(f){return !f.properties||!Array.isArray(f.properties.cells)||!f.properties.cells.length||f.properties.cells.some(function(i){return !Number.isInteger(i)||i<0||i>=288;})||!f.geometry||!['Polygon','MultiPolygon'].includes(f.geometry.type);}))throw new Error('Invalid municipalities');

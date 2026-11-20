@@ -139,7 +139,7 @@
   function positionWarnings() {
     var dock=$('streetWarnings');dock.replaceChildren();
     if(!enabled||!root.SSWeatherZones)return;
-    if(map.getZoom()>=SSWeatherZones.streetZoom){
+    if(SSWeatherZones.streetView){
       var center=map.getCenter();
       warningMarkers.forEach(function(marker){
         var el=marker.getElement();el.style.visibility='hidden';el.setAttribute('aria-hidden','true');
@@ -279,7 +279,7 @@
   }
   api.mount=function(m){
     map=m;
-    if(root.SSWeatherZones){SSWeatherZones.onstatus=badge;SSWeatherZones.mount(m);}
+    if(root.SSWeatherZones){SSWeatherZones.onStreetChange=positionWarnings;SSWeatherZones.onstatus=badge;SSWeatherZones.mount(m);}
     map.on('style.load',function(){labelPaint={};if(enabled)style();});
     map.on('error',function(e){if(enabled && mode==='precip' && e.sourceId==='weather-forecast'){tileFailed=true;badge();$('weatherStatus').textContent='Прогнозният слой не е достъпен за този час.';}});
     map.on('sourcedata',function(e){if(enabled && mode==='precip' && e.sourceId==='weather-forecast' && e.isSourceLoaded && !tileFailed)$('weatherStatus').textContent='Прогнозен модел · обща картина, не точност по улици';});

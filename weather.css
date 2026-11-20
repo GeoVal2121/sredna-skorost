@@ -69,9 +69,9 @@ html.dark .weather-risk-label{color:#f3d16b;text-shadow:0 0 3px #172638,0 0 3px 
 .weather-wind{position:absolute;inset:0;pointer-events:none;width:100%;height:100%}
 html.dark .weather-place-label{background:none;border:0;color:#e0eef6;box-shadow:none;text-shadow:0 0 2px #172638,0 1px 2px #172638}html.dark .weather-place-label img{filter:invert(92%) sepia(9%) saturate(300%) hue-rotate(160deg)}
 
-html .weather-place-label img.weather-condition-icon,html.dark .weather-place-label img.weather-condition-icon{filter:none;width:22px;height:22px}
+html .weather-place-label img.weather-condition-icon,html.dark .weather-place-label img.weather-condition-icon{filter:none}
 
-.weather-place-label img{width:22px;height:22px}
+.weather-place-label img{width:var(--forecast-icon-size,22px);height:var(--forecast-icon-size,22px)}
 .weather-wind-arrow{pointer-events:none;opacity:.55}
 .weather-wind-arrow img{display:block;width:22px;height:22px;filter:invert(36%) sepia(40%) saturate(1000%) hue-rotate(150deg);animation:weather-wind-flow 1.8s linear infinite}
 html.dark .weather-wind-arrow img{filter:invert(85%) sepia(40%) saturate(500%) hue-rotate(140deg)}
@@ -81,7 +81,13 @@ html.dark .weather-wind-arrow img{filter:invert(85%) sepia(40%) saturate(500%) h
 #streetWeather{align-self:flex-start;color:var(--tx);text-shadow:0 0 3px var(--panel),0 0 5px var(--panel)}
 body:not(.weather-open) #streetWeather,#streetWeather:not(:has(button,.street-warning)){display:none}
 #streetForecast button{font-size:24px;font-weight:650;gap:7px}
-#streetForecast button img{width:42px;height:42px}
+
 .street-warning{display:flex;align-items:center;gap:6px;margin-top:3px;font-size:13px}
 .street-warning strong,.street-warning small{display:block}
 #streetRisks button{pointer-events:auto;padding:2px;max-width:none}
+
+.weather-place-label.maplibregl-marker>*{opacity:var(--place-opacity,1)}
+#streetForecast button img{width:42px;height:42px}
+.street-view #streetWeather{opacity:var(--dock-opacity,1);animation:street-weather-enter 200ms ease-out}
+@keyframes street-weather-enter{from{opacity:0}to{opacity:var(--dock-opacity,1)}}
+@media(prefers-reduced-motion:reduce){.street-view #streetWeather{animation:none}}
