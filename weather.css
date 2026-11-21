@@ -83,7 +83,10 @@ body:not(.weather-open) #streetWeather,#streetWeather:not(:has(button,.street-wa
 #streetForecast button{position:relative;isolation:isolate;font-size:24px;font-weight:650;gap:7px;--forecast-halo:255,255,255}
 #streetForecast button::before{content:"";position:absolute;inset:-7px -13px;z-index:-1;pointer-events:none;background:radial-gradient(ellipse closest-side,rgba(var(--forecast-halo),.96) 32%,rgba(var(--forecast-halo),.82) 57%,rgba(var(--forecast-halo),0) 100%)}
 html.dark #streetForecast button{--forecast-halo:14,25,42;color:#fff}
-html.dark #streetForecast .weather-condition-icon[src$="/sun.svg"]{content:url("lib/weather-icons/color/moon.svg")}
+html.dark img[src$="/sun.svg"]{content:url("lib/weather-icons/color/moon.svg");filter:none!important}
+html.dark img[src$="/partly-cloudy.svg"]{content:url("lib/weather-icons/color/partly-cloudy-night.svg");filter:none!important}
+.night-weather,html.dark #weatherToggle svg,html.dark #themeToggle span{display:none}
+html.dark .night-weather{display:block}
 
 .street-warning{display:flex;align-items:center;gap:6px;margin-top:3px;font-size:13px}
 .street-warning strong,.street-warning small{display:block}

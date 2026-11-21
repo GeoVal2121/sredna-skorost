@@ -2,7 +2,7 @@
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
   // ---------- нова версия: ако телефонът е запазил стара, презарежда се автоматично ----------
-  var APP_VERSION = "2026.11.21-1";
+  var APP_VERSION = "2026.11.21-2";
   try {
     fetch("version.json?t=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
       if (j && j.v && j.v !== APP_VERSION && sessionStorage.getItem("ss_reload") !== j.v) {
@@ -252,7 +252,6 @@
     if (d === dark) return;
     dark = d;
     var toggle = $("themeToggle");
-    toggle.textContent = d ? "☀️" : "🌙";
     toggle.title = d ? "Светла тема" : "Тъмна тема";
     toggle.setAttribute("aria-label", toggle.title);
     document.documentElement.classList.toggle("dark", d);
