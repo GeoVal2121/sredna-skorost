@@ -80,7 +80,10 @@ html.dark .weather-wind-arrow img{filter:invert(85%) sepia(40%) saturate(500%) h
 
 #streetWeather{align-self:flex-start;color:var(--tx);text-shadow:0 0 3px var(--panel),0 0 5px var(--panel)}
 body:not(.weather-open) #streetWeather,#streetWeather:not(:has(button,.street-warning)){display:none}
-#streetForecast button{font-size:24px;font-weight:650;gap:7px}
+#streetForecast button{position:relative;isolation:isolate;font-size:24px;font-weight:650;gap:7px;--forecast-halo:255,255,255}
+#streetForecast button::before{content:"";position:absolute;inset:-7px -13px;z-index:-1;pointer-events:none;background:radial-gradient(ellipse closest-side,rgba(var(--forecast-halo),.96) 32%,rgba(var(--forecast-halo),.82) 57%,rgba(var(--forecast-halo),0) 100%)}
+html.dark #streetForecast button{--forecast-halo:14,25,42;color:#fff}
+html.dark #streetForecast .weather-condition-icon[src$="/sun.svg"]{content:url("lib/weather-icons/color/moon.svg")}
 
 .street-warning{display:flex;align-items:center;gap:6px;margin-top:3px;font-size:13px}
 .street-warning strong,.street-warning small{display:block}
@@ -88,6 +91,6 @@ body:not(.weather-open) #streetWeather,#streetWeather:not(:has(button,.street-wa
 
 .weather-place-label.maplibregl-marker>*{opacity:var(--place-opacity,1)}
 #streetForecast button img{width:42px;height:42px}
-.street-view #streetWeather{opacity:var(--dock-opacity,1);animation:street-weather-enter 200ms ease-out}
-@keyframes street-weather-enter{from{opacity:0}to{opacity:var(--dock-opacity,1)}}
-@media(prefers-reduced-motion:reduce){.street-view #streetWeather{animation:none}}
+#streetForecast button{animation:street-weather-enter 200ms ease-out}
+@keyframes street-weather-enter{from{opacity:0}to{opacity:1}}
+@media(prefers-reduced-motion:reduce){#streetForecast button{animation:none}}
