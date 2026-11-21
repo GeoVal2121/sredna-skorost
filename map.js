@@ -2,8 +2,8 @@
 (function () {
   "use strict";
   var App = window.SSApp, $ = function (id) { return document.getElementById(id); };
-  var map = null, ready = false, follow = true, track = [], car = null, carEl = null;
-  var heading = 0, headingAnchor = null, hasHeading = false, lastP = null, lastActiveId = null, offline = false, handlers = false;
+  var map = null, ready = false, follow = true, car = null, carEl = null;
+  var heading = 0, headingAnchor = null, hasHeading = false, lastActiveId = null, offline = false, handlers = false;
   var routeLine = null, destMarker = null, touching = false, refollowT = null, userZoomUntil = 0, pressT = null, pressXY = null;
   var selectedPitch = null;
   function targetPitch() { return selectedPitch == null ? (App.cfg.headUp ? 50 : 0) : selectedPitch; }
@@ -127,7 +127,6 @@
     g.fillStyle = "#3c4043"; g.beginPath(); g.arc(20, 26, 4, 0, 7); g.fill();
     var d = g.getImageData(0, 0, 52, 52); return { width: 52, height: 52, data: d.data };
   }
-  function trackGeo() { return { type: "Feature", geometry: { type: "LineString", coordinates: track.length > 1 ? track : [] }, properties: {} }; }
 
   function init() {
     if (!window.maplibregl) { App.toast("Картата не се зареди. Следенето работи и без нея."); return; }
@@ -163,7 +162,6 @@
       if (map.getSource("secs")) return;
       map.addSource("secs", { type: "geojson", data: sectionsGeo(null) });
       map.addSource("pts", { type: "geojson", data: pointsGeo() });
-      map.addSource("trk", { type: "geojson", data: trackGeo() });
       map.addSource("route", { type: "geojson", data: routeGeo() });
       // линиите под надписите и номерата на пътищата от картата
       // над пътищата, под надписите (в някои стилове има надписи и преди пътищата)
@@ -186,8 +184,6 @@
           "line-offset": ["interpolate", ["linear"], ["zoom"], 12, 0, 16, ["*", ["get", "shared"], 3]],
           "line-width": ["interpolate", ["linear"], ["zoom"], 10, ["case", ["==", ["get", "act"], 1], 6, 4],
             17, ["case", ["==", ["get", "act"], 1], 6, 5]], "line-opacity": isDark ? 0.95 : 0.9 } });
-      addBelow({ id: "trk", type: "line", source: "trk", layout: { "line-cap": "round", "line-join": "round" },
-        paint: { "line-color": isDark ? "#8c95ab" : "#9aa0a6", "line-width": 5, "line-opacity": 0.8 } });
       // стационарни камери: икона + ограничение
       if (!map.hasImage("cam")) map.addImage("cam", camIcon(), { pixelRatio: 2 });
       map.addSource("cams", { type: "geojson", data: camsGeo() });
@@ -371,9 +367,8 @@
     if (c.t < 1 || now - anim.lastFix < 3000) raf = requestAnimationFrame(frame);
   }
 
-  // без маршрут следата се прилепва към пътя от картата: най-близкият път до 20 м в посоката на движение,
-  // а между две точки на един и същ път се добавят и завоите му
-  var ROADS = { motorway: 1, trunk: 1, primary: 1, secondary: 1, tertiary: 1, minor: 1, service: 1, busway: 1 }, prevSnap = null;
+  // без маршрут позицията се прилепва към пътя от картата: най-близкият път до 20 м в посоката на движение
+  var ROADS = { motorway: 1, trunk: 1, primary: 1, secondary: 1, tertiary: 1, minor: 1, service: 1, busway: 1 };
   function proj(p, a, b) {
     var k = Math.cos(p[0] * Math.PI / 180), ax = a[1] * k, ay = a[0], dx = b[1] * k - ax, dy = b[0] - ay, l = dx * dx + dy * dy;
     var t = l ? Math.max(0, Math.min(1, ((p[1] * k - ax) * dx + (p[0] - ay) * dy) / l)) : 0, q = [ay + t * dy, (ax + t * dx) / k];
@@ -406,21 +401,6 @@
     var rest = fwd ? sn.line.slice(sn.i) : sn.line.slice(0, sn.i).reverse();
     return rest.length ? [sn.pt].concat(rest) : null;
   }
-  function addTrack(p, h, sn) {
-    if (sn && prevSnap) {
-      // предишната точка на същия път → завоите между двете точки
-      var j = -1, bd = 4;
-      for (var i = 1; i < sn.line.length; i++) { var r = proj(prevSnap, sn.line[i - 1], sn.line[i]); if (r.d < bd) { bd = r.d; j = i; } }
-      if (j > 0 && Math.abs(sn.i - j) < 200) {
-        if (j < sn.i) for (var a = j; a < sn.i; a++) track.push([sn.line[a][1], sn.line[a][0]]);
-        else for (var b2 = j - 1; b2 >= sn.i; b2--) track.push([sn.line[b2][1], sn.line[b2][0]]);
-      }
-    }
-    var q = sn ? sn.pt : p;
-    track.push([q[1], q[0]]); prevSnap = sn ? q : null;
-    while (track.length > 6000) track.shift();
-  }
-
   function onFix(fix, snap) {
     if (!map) return;
     var raw = [fix.lat, fix.lon], accurate = Number.isFinite(fix.acc) && fix.acc <= 30;
@@ -439,12 +419,6 @@
     if (!path) path = forwardPath(sn, hh, false);
     var stopped = Number.isFinite(fix.speed) && fix.speed < 0.7;
     if (path && path.length > 1 && !stopped && along(path, 0).h != null) heading = along(path, 0).h;
-    var moved = !lastP || SSCore.dist(lastP, p) > 8;
-    if (moved && accurate) {
-      if (snap) { track.push([p[1], p[0]]); prevSnap = null; if (track.length > 6000) track.shift(); }
-      else addTrack(p, hh, sn);
-      lastP = p;
-    }
     if (!car) car = new maplibregl.Marker({ element: carEl, rotationAlignment: "map", pitchAlignment: "map" }).setLngLat([p[1], p[0]]).addTo(map);
     var now = performance.now(), cur = anim.to ? animPos(now) : { p: p, h: heading };
     if (anim.to && SSCore.dist(cur.p, p) > 2000) cur = { p: p, h: heading }; // голям скок (демо, нов маршрут) — без анимация
@@ -454,7 +428,6 @@
     anim.path = path; anim.uncertain = !accurate;
     if (!raf) raf = requestAnimationFrame(frame);
     if (ready) {
-      map.getSource("trk").setData(trackGeo());
       var st = App.tracker().active, id = st ? st.sec.id : null;
       if (id !== lastActiveId) { lastActiveId = id; map.getSource("secs").setData(sectionsGeo(id)); }
     }
@@ -476,7 +449,7 @@
     map.getSource("secs").setData(sectionsGeo(lastActiveId));
     updateMeasurement();
   }
-  function resetTrack() { track = []; prevSnap = null; lastP = null; headingAnchor = null; hasHeading = false; heading = 0; anim.to = null; anim.lastFix = 0; if (ready) map.getSource("trk").setData(trackGeo()); setFollow(true); }
+  function resetTrack() { headingAnchor = null; hasHeading = false; heading = 0; anim.to = null; anim.lastFix = 0; setFollow(true); }
 
   // вид на пътя под точката и дали е в населено място (жилищна зона или сгради наоколо) – от картата
   function roadAt(p) {

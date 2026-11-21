@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');
 const path = require('node:path'), core = require('../core.js');
 const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+assert.doesNotMatch(read('map.js'), /(?:source|id): ["']trk["']/, 'GPS updates must not draw a trail behind the arrow');
 let now = 0, features = [];
 const map = { project: () => ({x:0,y:0}), queryRenderedFeatures: () => features,
   getSource: () => ({setData(){}}) };
@@ -12,8 +13,8 @@ ctx.window=ctx; vm.createContext(ctx);
 vm.runInContext(read('map.js').replace('  init();', `
   map = testMap; ready = true; carEl = {style:{}};
   window.qa = {onFix, updateHeading, animPos, roadSnap, forwardPath, along,
-    state:()=>({heading,hasHeading,anim,track}),
-    reset:()=>{heading=0;hasHeading=false;headingAnchor=null;lastP=null;anim.to=null;track=[];prevSnap=null;},
+    state:()=>({heading,hasHeading,anim}),
+    reset:()=>{heading=0;hasHeading=false;headingAnchor=null;anim.to=null;},
     route:(line)=>{routeLine=line;routeHead=null;routeFrom=0;}};`), Object.assign(ctx,{testMap:map}));
 const q=ctx.qa, base=[42,23];
 const east=m=>[42,23+m/(111320*Math.cos(42*Math.PI/180))];

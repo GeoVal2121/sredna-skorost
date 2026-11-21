@@ -22,7 +22,7 @@ Object.assign(ctx,{follow:true,touching:false,hasHeading:true,car:{setLngLat(){r
 ctx.App.tracker=()=>({speed:6});
 ctx.map={getCanvas:()=>({clientHeight:750}),getPitch:()=>0,getZoom:()=>15,getBearing:()=>30,
   jumpTo:o=>camera=o,stop:()=>stopped++};
-vm.runInContext(source.slice(source.indexOf('  function pad()'),source.indexOf('  // без маршрут следата')),ctx);
+vm.runInContext(source.slice(source.indexOf('  function pad()'),source.indexOf('  var ROADS =')),ctx);
 ctx.App.cfg.headUp=true;ctx.frame();assert.equal(camera.bearing,90,'slow travel must point forward');
 ctx.animPos=()=>({p:[42.001,23],h:180,t:1});ctx.frame();assert.equal(camera.bearing,180,'turn follows arrow without extra camera lag');
 ctx.App.tracker=()=>({speed:0});ctx.frame();assert.equal(camera.bearing,180,'stop preserves reliable heading');
