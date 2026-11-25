@@ -346,6 +346,14 @@
     return { p: [f[0] + (g[0] - f[0]) * t, f[1] + (g[1] - f[1]) * t], h: lerpAngle(anim.h0, h1, t), t: t };
   }
   function pad() { return { top: Math.round(map.getCanvas().clientHeight * 0.5), bottom: 100, left: 0, right: 0 }; } // стрелката в долната трета
+  var inSettlement = null, settlementCandidate = null, settlementSamples = 0;
+  function updateSettlement(urban) {
+    if (urban === null || urban === inSettlement) {
+      settlementCandidate = null; settlementSamples = 0; return;
+    }
+    if (urban !== settlementCandidate) { settlementCandidate = urban; settlementSamples = 0; }
+    if (++settlementSamples >= 3) inSettlement = urban;
+  }
   function frame() {
     raf = null; if (!anim.to) return;
     var now = performance.now(), c = animPos(now);
@@ -357,9 +365,15 @@
       camBearing = up ? (hasHeading ? c.h : map.getBearing()) : 0;
       var opt = { center: [c.p[1], c.p[0]], bearing: camBearing, pitch: map.getPitch() + (targetPitch() - map.getPitch()) * 0.1, padding: pad() };
       var z = map.getZoom();
-      if (z < 12) opt.zoom = 15;
-      else if (window.SSNav && SSNav.active() && Date.now() > userZoomUntil) {
-        var v = App.tracker().speed, tz = v > 90 ? 15 : v > 50 ? 16 : 17; opt.zoom = z + (tz - z) * 0.03;
+      if (Date.now() > userZoomUntil) {
+        var target = null;
+        if (inSettlement !== null) target = inSettlement ? 17 : 15;
+        else if (window.SSNav && SSNav.active()) {
+          var speed = App.tracker().speed;
+          target = speed > 90 ? 15 : speed > 50 ? 16 : 17;
+        }
+        if (z < 12) opt.zoom = 15;
+        else if (target !== null && Math.abs(target - z) > 0.01) opt.zoom = z + (target - z) * 0.03;
       }
       map.jumpTo(opt);
     }
@@ -404,6 +418,13 @@
   function onFix(fix, snap) {
     if (!map) return;
     var raw = [fix.lat, fix.lon], accurate = Number.isFinite(fix.acc) && fix.acc <= 30;
+    var area = null;
+    if (accurate && follow && !touching && ready && !offline && map.getZoom() >= 14 &&
+        map.getBounds().contains([fix.lon, fix.lat]) && map.isSourceLoaded("openmaptiles")) {
+      // Keep the search area comparable as the camera zooms in or out.
+      area = roadAt(raw, 45 * Math.pow(2, map.getZoom() - 16));
+    }
+    updateSettlement(area && (area.urban || area.cls) ? area.urban : null);
     updateHeading(fix);
     var hh = hasHeading ? heading : null, path = null;
     if (snap && accurate && hasHeading) {
@@ -449,16 +470,17 @@
     map.getSource("secs").setData(sectionsGeo(lastActiveId));
     updateMeasurement();
   }
-  function resetTrack() { headingAnchor = null; hasHeading = false; heading = 0; anim.to = null; anim.lastFix = 0; setFollow(true); }
+  function resetTrack() { inSettlement = null; updateSettlement(null); headingAnchor = null; hasHeading = false; heading = 0; anim.to = null; anim.lastFix = 0; setFollow(true); }
 
   // вид на пътя под точката и дали е в населено място (жилищна зона или сгради наоколо) – от картата
-  function roadAt(p) {
+  function roadAt(p, radius) {
+    if (radius === undefined) radius = 60;
     if (!map || !ready || offline) return null;
     var c = map.project([p[1], p[0]]), cls = null, urban = false, bld = 0;
     map.queryRenderedFeatures([[c.x - 6, c.y - 6], [c.x + 6, c.y + 6]]).forEach(function (f) {
       if (f.sourceLayer === "transportation" && !cls) cls = f.properties["class"];
     });
-    map.queryRenderedFeatures([[c.x - 60, c.y - 60], [c.x + 60, c.y + 60]]).forEach(function (f) {
+    map.queryRenderedFeatures([[c.x - radius, c.y - radius], [c.x + radius, c.y + radius]]).forEach(function (f) {
       if (f.sourceLayer === "landuse" && f.properties["class"] === "residential") urban = true;
       if (f.sourceLayer === "building") bld++;
     });

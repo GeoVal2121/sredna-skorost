@@ -3,7 +3,7 @@ const path = require('node:path'), core = require('../core.js');
 const read = file => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
 assert.doesNotMatch(read('map.js'), /(?:source|id): ["']trk["']/, 'GPS updates must not draw a trail behind the arrow');
 let now = 0, features = [];
-const map = { project: () => ({x:0,y:0}), queryRenderedFeatures: () => features,
+const map = { getZoom:()=>15, getBounds:()=>({contains:()=>true}), isSourceLoaded:()=>false, project: () => ({x:0,y:0}), queryRenderedFeatures: () => features,
   getSource: () => ({setData(){}}) };
 class Marker { setLngLat(p){this.p=p;return this} addTo(){return this} setRotation(h){this.h=h;return this} }
 const ctx = { SSCore: core, SSApp: { isDark:()=>false, tracker:()=>({speed:36,active:null}) },

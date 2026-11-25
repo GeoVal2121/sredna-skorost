@@ -32,3 +32,11 @@ ctx.hasHeading=true;
 vm.runInContext(source.slice(source.indexOf('  function recenter()'),source.indexOf('  function refresh()')),ctx);
 ctx.recenter();assert.equal(stopped,1);ctx.frame();assert.equal(camera.bearing,180,'recenter cannot leave follow locked behind moveend');
 console.log('PASS: forward camera at low speed, turns, stop, north-up, unknown bearing, recenter resume');
+
+ctx.updateSettlement(true);ctx.updateSettlement(true);ctx.frame();assert.equal(camera.zoom,undefined);
+ctx.updateSettlement(true);ctx.frame();assert(camera.zoom>15,'entering a settlement zooms in without a route');
+ctx.map.getZoom=()=>17;
+ctx.updateSettlement(false);ctx.updateSettlement(null);ctx.updateSettlement(false);ctx.updateSettlement(false);
+ctx.frame();assert.equal(camera.zoom,undefined,'missing data resets exit confirmation');
+ctx.updateSettlement(false);ctx.frame();assert(camera.zoom<17,'leaving zooms out');
+ctx.userZoomUntil=Date.now()+20000;ctx.frame();assert.equal(camera.zoom,undefined,'manual zoom takes priority');
