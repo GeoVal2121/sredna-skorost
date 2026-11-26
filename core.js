@@ -61,32 +61,6 @@
     for (var k in overrides || {}) if (points[k]) { points[k].p = overrides[k].p; points[k].src = overrides[k].src; }
   }
 
-  // Наместване на приблизителните точки върху тол рамки от OSM (highway=toll_gantry).
-  // Приема се само ако разстоянието между двата края на отсечката съответства на дължината ѝ.
-  function snapToGantries(data, gantries, maxM) {
-    maxM = maxM || 4000;
-    var cand = {}, k, i;
-    for (k in data.points) {
-      var best = null, bd = Infinity;
-      for (i = 0; i < gantries.length; i++) {
-        var d = dist(data.points[k], gantries[i]);
-        if (d < bd) { bd = d; best = gantries[i]; }
-      }
-      if (best && bd <= maxM) cand[k] = best;
-    }
-    var bad = {};
-    data.sections.forEach(function (r) {
-      var a = r[0] + ":" + r[1], b = r[0] + ":" + r[3], Lm = sectionLength(r) * 1000;
-      var pa = cand[a] || data.points[a], pb = cand[b] || data.points[b];
-      var slack = (cand[a] && cand[b]) ? 300 : maxM; // и двата края уточнени → строга проверка
-      var d = dist(pa, pb);
-      if (d > Lm * 1.02 + slack || d < Lm * 0.4) { bad[a] = 1; bad[b] = 1; }
-    });
-    var out = {};
-    for (k in cand) if (!bad[k]) out[k] = { p: cand[k], src: "osm" };
-    return out;
-  }
-
   function Tracker(model, opts) {
     this.m = model;
     this.margin = (opts && opts.margin != null) ? opts.margin : 3;
@@ -220,6 +194,57 @@
     return { sec: s, elapsedMin: h * 60, trav: trav, remaining: remaining, avg: avg, rec: rec, predicted: predicted, status: status };
   };
 
+  // Включване на отсечка без засечена начална рамка (пропусната рамка или презареждане).
+  // t0 = времето при началната рамка; trav = изминато от рамката, км.
+  Tracker.prototype.adopt = function (sec, t0, trav, approx) {
+    this.cands = [];
+    this.active = { sec: sec, t0: t0, odo0: this.odo - trav * 1000, minDEnd: Infinity, approx: !!approx };
+  };
+
+  // Ако позицията е по линията на отсечка, по нейната посока, но рамката не е засечена:
+  // време на влизане по интерполация от предишната позиция (approx при пауза над 10 с) или по скоростта.
+  Tracker.prototype.recover = function (p, now, prev, lineOf) {
+    if (this.active || this.cands.length || !prev || now - prev.t > 15 * 60e3) return null;
+    var self = this, pts = this.m.points, found = null;
+    this.m.sections.forEach(function (s) {
+      if (found) return;
+      var a = pts[s.fromKey].p, b = pts[s.toKey].p;
+      if (dist(p, a) + dist(p, b) > s.L * 1300 + 500) return;
+      var L = lineOf(s), q = project(L, p);
+      if (q.d > 60 || q.s < 200 || q.s > q.len - 200) return;
+      var q0 = project(L, prev.p), s0;
+      if (q0.d <= 60 && q0.s > 0) s0 = q0.s;
+      else if (dist(prev.p, a) < 5000) s0 = -dist(prev.p, a);
+      else return;
+      if (q.s - s0 < 20) return;
+      var t0, approx;
+      if (s0 <= 0) { t0 = prev.t + (now - prev.t) * (-s0) / (q.s - s0); approx = now - prev.t > 10000; }
+      else {
+        var v = (q.s - s0) / Math.max((now - prev.t) / 1000, 0.5);
+        if (!(v > 3 && v < 70)) return;
+        t0 = prev.t - s0 / v * 1000; approx = true;
+      }
+      self.adopt(s, t0, q.s / 1000, approx);
+      found = s;
+    });
+    return found;
+  };
+
+  // Проекция на точка върху линия [[lat,lon],...]: s = метри от началото по линията, d = отклонение, len = обща дължина.
+  function project(line, p) {
+    var best = { s: 0, d: Infinity, len: 0 }, acc = 0, k = Math.cos(rad(p[0])) * 111320;
+    for (var i = 1; i < line.length; i++) {
+      var a = line[i - 1], b = line[i], seg = dist(a, b);
+      var ax = (a[1] - p[1]) * k, ay = (a[0] - p[0]) * 110540, bx = (b[1] - p[1]) * k, by = (b[0] - p[0]) * 110540;
+      var dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy, t = L2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / L2)) : 0;
+      var d = Math.sqrt(Math.pow(ax + t * dx, 2) + Math.pow(ay + t * dy, 2));
+      if (d < best.d) { best.d = d; best.s = acc + t * seg; }
+      acc += seg;
+    }
+    best.len = acc;
+    return best;
+  }
+
   // Най-близко начало на отсечка (за празния екран)
   Tracker.prototype.nearest = function () {
     if (!this.last) return null;
@@ -280,6 +305,6 @@
     return Math.asin(Math.sin(rad(lat)) * Math.sin(dec) + Math.cos(rad(lat)) * Math.cos(dec) * Math.cos(H)) * 180 / Math.PI;
   }
 
-  var api = { measureSections: measureSections, sunAlt: sunAlt, CamWatch: CamWatch, bearing: bearing, decodePolyline: decodePolyline, dist: dist, buildModel: buildModel, applyOverrides: applyOverrides, snapToGantries: snapToGantries, Tracker: Tracker };
+  var api = { measureSections: measureSections, sunAlt: sunAlt, CamWatch: CamWatch, bearing: bearing, decodePolyline: decodePolyline, dist: dist, buildModel: buildModel, applyOverrides: applyOverrides, project: project, Tracker: Tracker };
   if (typeof module !== "undefined") module.exports = api; else root.SSCore = api;
 })(this);

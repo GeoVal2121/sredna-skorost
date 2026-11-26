@@ -13,7 +13,7 @@
 <link rel="icon" href="icon-gantry-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icon-gantry-180.png">
 <link rel="stylesheet" href="lib/maplibre-gl.css?v=ab1e70d59ec4">
-<link rel="stylesheet" href="weather.css?v=2026.11.25-1">
+<link rel="stylesheet" href="weather.css?v=2026.11.26-1">
 <style>
 :root{--bg:#eef1f4;--panel:#fffffff2;--line:#d8dee6;--tx:#1f2933;--mut:#5f6b7a;--ok:#188038;--warn:#e37400;--bad:#d93025;--acc:#1a73e8;
   --st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);--sl:env(safe-area-inset-left,0px);--sr:env(safe-area-inset-right,0px)}
@@ -38,11 +38,13 @@ button:active{transform:scale(.97)}
 .limit{margin-left:auto;flex:none;width:46px;height:46px;border-radius:50%;border:5px solid #d62828;background:#fff;color:#111;display:grid;place-items:center;font-weight:800;font-size:17px}
 .bar{height:6px;border-radius:9px;background:#e3e8ef;margin:8px 0;overflow:hidden}
 .bar i{display:block;height:100%;width:0;background:var(--acc);transition:width .5s}
-.grid{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:8px}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .cell{background:#f1f4f8;border-radius:10px;padding:6px 8px}
-.cell span{display:block;font-size:11px;color:var(--mut)}
+.cell{min-width:0;white-space:nowrap}.cell span{display:block;font-size:11px;color:var(--mut);white-space:normal}.cell small{font-size:12px;color:var(--mut);margin-left:2px}
 .cell b{font-size:22px;font-variant-numeric:tabular-nums}
 .cell.big b{font-size:34px;line-height:1.05}
+#act{padding:8px 10px}#act .sec-name{font-size:14px}#act .sec-name small{font-size:11px}#act .bar{height:4px;margin:6px 0}#act .grid{gap:6px}#act .cell{padding:4px 6px;border-radius:8px}#act .cell b,#act .cell.big b{font-size:20px;line-height:1.15}#act .extra{font-size:11px;margin-top:5px}
+.cell.slow{background:#fdeaea}.cell.slow span,.cell.slow b{color:var(--bad)}
 .ok b.v{color:var(--ok)}.warn b.v{color:var(--warn)}.over b.v{color:var(--bad)}
 .card.over{border-color:var(--bad);box-shadow:0 0 0 2px #d9302555 inset,0 2px 10px #0002}
 .extra{display:flex;gap:14px;font-size:12px;color:var(--mut);margin-top:6px}
@@ -154,7 +156,7 @@ button:disabled{opacity:.5}
 html.dark{--bg:#1e2740;--panel:#26314ff2;--line:#3d4a6b;--tx:#e8eaed;--mut:#a3adb8;color-scheme:dark}
 html.dark #map{background:#1e2740}
 html.dark .sheet>div,html.dark .srch,html.dark .searchBtn,html.dark .maplibregl-popup-content{background:#26314f}
-html.dark .cell,html.dark .row select,html.dark .row input,html.dark .tag,html.dark .srow input,html.dark .sg .ico,html.dark .aform input,html.dark .tabs button{background:#303c5c;color:var(--tx)}
+html.dark .cell.slow{background:#5a2a33}html.dark .cell,html.dark .row select,html.dark .row input,html.dark .tag,html.dark .srow input,html.dark .sg .ico,html.dark .aform input,html.dark .tabs button{background:#303c5c;color:var(--tx)}
 html.dark .bar{background:#3d4a6b}
 html.dark .list div,html.dark .sg{border-color:#3d4a6b}
 html.dark .tabs button.on{background:#1a3a66;color:#8ab4f8}
@@ -246,12 +248,12 @@ html.dark .road-badge{background:#223e64;color:#d6e7ff;border-color:#5578a6}
   <div class="card" id="idle"><div id="nearest" class="mut">Натисни „Старт“, за да започне следенето.</div></div>
   <button id="installEntry" type="button" data-install hidden>↓ Инсталирай приложението</button>
   <div class="card" id="act" hidden>
-    <div class="sec-name"><div><small id="aRoad"></small><span id="aName"></span></div><div class="limit" id="aLim">140</div></div>
+    <div class="sec-name"><div><small><span id="aRoad"></span> · средна до <span id="aLim">140</span> км/ч</small><span id="aName"></span></div></div>
     <div class="bar"><i id="aBar"></i></div>
     <div class="grid">
       <div class="cell big" id="aAvgCell"><span>Средна</span><b class="v" id="aAvg">–</b></div>
-      <div class="cell"><span>Карай до</span><b id="aRec">–</b></div>
-      <div class="cell"><span>Остават, км</span><b id="aRem">–</b></div>
+      <div class="cell" id="aRecCell"><span id="aRecL">Изравняване</span><b id="aRec">–</b></div>
+      <div class="cell"><span>Остават</span><b id="aRem">–</b><small>км</small></div>
     </div>
     <div class="extra"><span>При тази скорост: <b id="aPred">–</b></span><span>Време: <b id="aTime">–</b></span></div>
     <p class="mut" id="aNote" style="margin-top:6px;font-size:12px"></p>
@@ -383,21 +385,21 @@ html.dark .road-badge{background:#223e64;color:#d6e7ff;border-color:#5578a6}
 <div class="toast" id="toast"></div>
 
 </div>
-<script defer src="install.js?v=2026.11.25-1"></script>
-<script defer src="viewport.js?v=2026.11.25-1"></script>
-<script defer src="towns.js?v=2026.11.25-1"></script>
-<script defer src="data.js?v=2026.11.25-1"></script>
-<script defer src="roadlim.js?v=2026.11.25-1"></script>
-<script defer src="cameras.js?v=2026.11.25-1"></script>
-<script defer src="geometry.js?v=2026.11.25-1"></script>
-<script defer src="direction-geometry.js?v=2026.11.25-1"></script>
-<script defer src="core.js?v=2026.11.25-1"></script>
-<script defer src="app.js?v=2026.11.25-1"></script>
+<script defer src="install.js?v=2026.11.26-1"></script>
+<script defer src="viewport.js?v=2026.11.26-1"></script>
+<script defer src="towns.js?v=2026.11.26-1"></script>
+<script defer src="data.js?v=2026.11.26-1"></script>
+<script defer src="roadlim.js?v=2026.11.26-1"></script>
+<script defer src="cameras.js?v=2026.11.26-1"></script>
+<script defer src="geometry.js?v=2026.11.26-1"></script>
+<script defer src="direction-geometry.js?v=2026.11.26-1"></script>
+<script defer src="core.js?v=2026.11.26-1"></script>
+<script defer src="app.js?v=2026.11.26-1"></script>
 <script defer src="lib/maplibre-gl.js?v=45a9b07a9189"></script>
-<script defer src="weather-zones.js?v=2026.11.25-1"></script>
-<script defer src="weather.js?v=2026.11.25-1"></script>
-<script defer src="map.js?v=2026.11.25-1"></script>
-<script defer src="navcore.js?v=2026.11.25-1"></script>
-<script defer src="nav.js?v=2026.11.25-1"></script>
+<script defer src="weather-zones.js?v=2026.11.26-1"></script>
+<script defer src="weather.js?v=2026.11.26-1"></script>
+<script defer src="map.js?v=2026.11.26-1"></script>
+<script defer src="navcore.js?v=2026.11.26-1"></script>
+<script defer src="nav.js?v=2026.11.26-1"></script>
 </body>
 </html>

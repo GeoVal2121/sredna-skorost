@@ -2,7 +2,7 @@
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
   // ---------- нова версия: ако телефонът е запазил стара, презарежда се автоматично ----------
-  var APP_VERSION = "2026.11.25-1";
+  var APP_VERSION = "2026.11.26-1";
   try {
     fetch("version.json?t=" + Date.now(), { cache: "no-store" }).then(function (r) { return r.json(); }).then(function (j) {
       if (j && j.v && j.v !== APP_VERSION && sessionStorage.getItem("ss_reload") !== j.v) {
@@ -167,6 +167,39 @@
   setInterval(function () {
     if (watchId != null && lastRecv && Date.now() - lastRecv > 3000) { var g = $("gps"); g.textContent = "GPS: няма сигнал"; g.className = "chip bad"; $("spd").textContent = "–"; }
   }, 1000);
+  // ---------- отсечка без засечена начална рамка (пропусната рамка, пауза на GPS, презареждане) ----------
+  var lines = {}, savedAct = store.get("act", null), savedId = null;
+  function lineOf(s) {
+    if (lines[s.id]) return lines[s.id];
+    var dir = window.SS_DIRECTION_GEO && SS_DIRECTION_GEO[s.id], enc = dir || (window.SS_GEO && SS_GEO[parseInt(s.id, 10)]);
+    var L = enc ? SSCore.decodePolyline(enc) : [model.points[s.fromKey].p, model.points[s.toKey].p];
+    if (enc && !dir && /r$/.test(s.id)) L = L.slice().reverse();
+    return (lines[s.id] = L);
+  }
+  function recover(fix, prev) {
+    var p = [fix.lat, fix.lon], now = fix.t;
+    // 1) запазена отсечка след презареждане: известно е точното време на влизане
+    if (savedAct && now - savedAct.seen < 3 * 3600e3) {
+      var ss = model.sections.filter(function (x) { return x.id === savedAct.id; })[0];
+      if (ss) {
+        var sp = SSCore.project(lineOf(ss), p);
+        if (sp.d < 100 && sp.s > 0 && sp.s < sp.len - 50) { tracker.adopt(ss, savedAct.t0, sp.s / 1000, savedAct.approx); savedAct = null; $("res").hidden = true; return; }
+      }
+    }
+    savedAct = null;
+    var s = tracker.recover(p, now, prev, lineOf);
+    if (s) {
+      $("res").hidden = true;
+      say("Навлизате в зона за средна скорост " + s.from + " – " + s.to + ". Ограничение " + s.limit + ".", true);
+    }
+  }
+  function saveAct(t) {
+    var a = tracker.active;
+    if (a) store.set("act", { id: a.sec.id, t0: a.t0, approx: !!a.approx, seen: t });
+    else if (savedId) store.set("act", null);
+    savedId = a ? a.sec.id : null;
+  }
+
   function onFix(fix) {
     var g = $("gps"), previous = tracker.last;
     if (!Number.isFinite(fix.lat) || Math.abs(fix.lat) > 90 || !Number.isFinite(fix.lon) || Math.abs(fix.lon) > 180 ||
@@ -183,6 +216,9 @@
     lastFix = fix; lastRecv = Date.now();
     var evs = tracker.feed(fix);
     evs.forEach(onEvent);
+    if (!tracker.active && !demoTimer) recover(fix, previous);
+    if (!demoTimer) saveAct(fix.t);
+    if (!demoTimer && store.get("run", 0) && Date.now() - store.get("run", 0) > 60e3) store.set("run", Date.now());
     if (cfg.cams) camWatch.feed({ p: [fix.lat, fix.lon], t: fix.t, speed: tracker.speed, heading: fix.heading }).forEach(onCam);
     render(fix.t);
     roadLimit(fix);
@@ -291,12 +327,16 @@
       $("aAvg").textContent = st.avg == null ? "–" : r0(st.avg);
       $("aAvgCell").className = "cell big " + st.status;
       $("act").className = "card" + (st.status === "over" ? " over" : "");
+      var slow = st.status === "over" || (st.rec != null && r0(st.rec) < s.limit);
+      $("aRecL").textContent = slow ? "Намали до" : "Изравняване";
+      $("aRecCell").className = "cell" + (slow ? " slow" : "");
       $("aRec").textContent = st.rec == null || st.rec < 50 ? "–" : r0(st.rec);
       $("aRem").textContent = st.remaining.toFixed(1).replace(".", ",");
       $("aPred").textContent = r0(st.predicted);
       $("aTime").textContent = fmtMin(st.elapsedMin);
       var pa = model.points[s.fromKey].src, pb = model.points[s.toKey].src;
-      $("aNote").textContent = (pa === "approx" || pb === "approx") ? "Приблизителни рамки: началото и краят може да се отчетат с 1–2 км разлика." : "";
+      $("aNote").textContent = tracker.active.approx ? "Началната рамка е пропусната: средната е изчислена приблизително." :
+        (pa === "approx" || pb === "approx") ? "Приблизителни рамки: началото и краят може да се отчетат с 1–2 км разлика." : "";
     } else {
       var n = tracker.nearest();
       if (tracker.cands.length) $("nearest").textContent = "Мина под рамка — определям посоката…";
@@ -370,7 +410,9 @@
   }
 
   // ---------- връзки ----------
-  $("go").onclick = function () { (watchId != null || demoTimer) ? stop() : start(); };
+  $("go").onclick = function () {
+    if (watchId != null || demoTimer) { stop(); store.set("run", null); } else { start(); store.set("run", Date.now()); }
+  };
   // UI trial only: no reporting requests, GPS access or persistent storage.
   $("reportBtn").onclick = function () { $("reportNotice").hidden = true; $("reportPanel").showModal(); };
   $("reportClose").onclick = function () { $("reportPanel").close(); };
@@ -423,4 +465,10 @@
     res.innerHTML = "<h2>Последна отсечка</h2>" + last.road + " · " + last.name + ": <b>" + r0(last.avg) + " км/ч</b>";
   }
   if (/demo/.test(location.hash)) demo();
+  else if (Date.now() - (store.get("run", 0) || 0) < 30 * 60e3) {
+    // следенето беше включено преди презареждането: продължава само, ако GPS вече е разрешен
+    try {
+      navigator.permissions.query({ name: "geolocation" }).then(function (r) { if (r.state === "granted" && watchId == null) start(); }).catch(function () { });
+    } catch (e) { }
+  }
 })();
