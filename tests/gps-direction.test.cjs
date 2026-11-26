@@ -49,7 +49,7 @@ near(q.along(corner,10).h,0);near(q.along([base,base,east(10)],0).h,90);
 // Exercise the shared GPS ingress: rejected fixes must reach none of its consumers.
 const app=read('app.js'), gps={}, feeds=[];
 const ingress={lastFix:null,lastRecv:0,demoTimer:null,tracker:{last:null,feed:f=>{feeds.push(f);return[]},speed:0},
-  $:()=>gps,SSCore:core,r0:Math.round,Date,cfg:{cams:false},onEvent(){},render(){},roadLimit(){},window:{}};
+  $:()=>gps,SSCore:core,r0:Math.round,Date,cfg:{cams:false},onEvent(){},render(){},roadLimit(){},recover(){},saveAct(){},store:{get(){},set(){}},window:{}};
 vm.createContext(ingress);vm.runInContext(app.slice(app.indexOf('  function onFix(fix)'),app.indexOf('  function start()')),ingress);
 for(const bad of [{acc:200},{acc:NaN},{lat:NaN},{lon:181},{t:Date.now()-10000}]) ingress.onFix({...fix(0),...bad});
 assert.equal(feeds.length,0);ingress.onFix(fix(0));assert.equal(feeds.length,1);
