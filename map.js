@@ -347,12 +347,16 @@
   }
   function pad() { return { top: Math.round(map.getCanvas().clientHeight * 0.5), bottom: 100, left: 0, right: 0 }; } // стрелката в долната трета
   var inSettlement = null, settlementCandidate = null, settlementSamples = 0;
-  function updateSettlement(urban) {
+  var settlementStart = null;
+  function updateSettlement(urban, position) {
     if (urban === null || urban === inSettlement) {
-      settlementCandidate = null; settlementSamples = 0; return;
+      settlementCandidate = null; settlementSamples = 0; settlementStart = null; return;
     }
-    if (urban !== settlementCandidate) { settlementCandidate = urban; settlementSamples = 0; }
-    if (++settlementSamples >= 3) inSettlement = urban;
+    if (urban !== settlementCandidate) {
+      settlementCandidate = urban; settlementSamples = 0; settlementStart = position;
+    }
+    // Repeated fixes on the same patch of road cannot confirm a departure.
+    if (++settlementSamples >= 3 && (urban || SSCore.dist(settlementStart, position) >= 150)) inSettlement = urban;
   }
   function frame() {
     raf = null; if (!anim.to) return;
@@ -367,10 +371,10 @@
       var z = map.getZoom();
       if (Date.now() > userZoomUntil) {
         var target = null;
-        if (inSettlement !== null) target = inSettlement ? 17 : 15;
+        if (inSettlement !== null) target = inSettlement ? Math.max(z, 17) : 15;
         else if (window.SSNav && SSNav.active()) {
           var speed = App.tracker().speed;
-          target = speed > 90 ? 15 : speed > 50 ? 16 : 17;
+          target = speed > 90 ? 15 : speed > 50 ? 16 : Math.max(z, 17);
         }
         if (z < 12) opt.zoom = 15;
         else if (target !== null && Math.abs(target - z) > 0.01) opt.zoom = z + (target - z) * 0.03;
@@ -424,7 +428,7 @@
       // Keep the search area comparable as the camera zooms in or out.
       area = roadAt(raw, 45 * Math.pow(2, map.getZoom() - 16));
     }
-    updateSettlement(area && (area.urban || area.cls) ? area.urban : null);
+    updateSettlement(area ? area.settlement : null, raw);
     updateHeading(fix);
     var hh = hasHeading ? heading : null, path = null;
     if (snap && accurate && hasHeading) {
@@ -476,15 +480,18 @@
   function roadAt(p, radius) {
     if (radius === undefined) radius = 60;
     if (!map || !ready || offline) return null;
-    var c = map.project([p[1], p[0]]), cls = null, urban = false, bld = 0;
+    var c = map.project([p[1], p[0]]), cls = null, urban = false, rural = false, bld = 0;
     map.queryRenderedFeatures([[c.x - 6, c.y - 6], [c.x + 6, c.y + 6]]).forEach(function (f) {
       if (f.sourceLayer === "transportation" && !cls) cls = f.properties["class"];
     });
     map.queryRenderedFeatures([[c.x - radius, c.y - radius], [c.x + radius, c.y + radius]]).forEach(function (f) {
-      if (f.sourceLayer === "landuse" && f.properties["class"] === "residential") urban = true;
+      var kind = f.properties["class"];
+      if (f.sourceLayer === "landuse" && /^(residential|commercial|industrial|retail)$/.test(kind)) urban = true;
+      if ((f.sourceLayer === "landcover" || f.sourceLayer === "landuse") && /^(farmland|farm|orchard|vineyard|forest|wood)$/.test(kind)) rural = true;
       if (f.sourceLayer === "building") bld++;
     });
-    return { cls: cls, urban: urban || bld >= 3 };
+    urban = urban || bld >= 3;
+    return { cls: cls, urban: urban, settlement: urban ? true : rural && cls ? false : null };
   }
 
   function setRoute(line, fit) {

@@ -33,10 +33,35 @@ vm.runInContext(source.slice(source.indexOf('  function recenter()'),source.inde
 ctx.recenter();assert.equal(stopped,1);ctx.frame();assert.equal(camera.bearing,180,'recenter cannot leave follow locked behind moveend');
 console.log('PASS: forward camera at low speed, turns, stop, north-up, unknown bearing, recenter resume');
 
-ctx.updateSettlement(true);ctx.updateSettlement(true);ctx.frame();assert.equal(camera.zoom,undefined);
-ctx.updateSettlement(true);ctx.frame();assert(camera.zoom>15,'entering a settlement zooms in without a route');
+ctx.SSCore=require('../core.js');
+const street=[42.66,23.28];
+ctx.updateSettlement(true,street);ctx.updateSettlement(true,street);ctx.frame();assert.equal(camera.zoom,undefined);
+ctx.updateSettlement(true,street);ctx.frame();assert(camera.zoom>15,'entering a settlement zooms in without a route');
+ctx.map.getZoom=()=>18;
+ctx.frame();assert.equal(camera.zoom,undefined,'a closer city view stays close');
 ctx.map.getZoom=()=>17;
-ctx.updateSettlement(false);ctx.updateSettlement(null);ctx.updateSettlement(false);ctx.updateSettlement(false);
+for(let i=0;i<20;i++) ctx.updateSettlement(false,[street[0]+(i%2)*0.00005,street[1]]);
+ctx.frame();assert.equal(camera.zoom,undefined,'stationary fixes with GPS drift cannot trigger zoom out');
+ctx.updateSettlement(null);ctx.updateSettlement(false,street);ctx.updateSettlement(false,[42.661,23.28]);
 ctx.frame();assert.equal(camera.zoom,undefined,'missing data resets exit confirmation');
-ctx.updateSettlement(false);ctx.frame();assert(camera.zoom<17,'leaving zooms out');
+ctx.updateSettlement(false,[42.662,23.28]);ctx.frame();assert(camera.zoom<17,'leaving zooms out');
 ctx.userZoomUntil=Date.now()+20000;ctx.frame();assert.equal(camera.zoom,undefined,'manual zoom takes priority');
+
+vm.runInContext(source.slice(source.indexOf('  function roadAt('),source.indexOf('  function setRoute(')),ctx);
+ctx.ready=true;ctx.offline=false;ctx.userZoomUntil=0;
+ctx.map.project=()=>({x:50,y:50});
+const feature=(sourceLayer,kind)=>({sourceLayer,properties:{class:kind}});
+let surroundings=[];
+ctx.map.queryRenderedFeatures=box=>box[0][0]===44?[feature('transportation','minor')]:surroundings;
+ctx.App.tracker=()=>({speed:5});
+ctx.window.SSNav=ctx.SSNav={active:()=>true};
+ctx.inSettlement=null;ctx.updateSettlement(null);ctx.map.getZoom=()=>18;
+for(let i=0;i<180;i++){
+  const position=[street[0]+i*0.000012,street[1]];
+  ctx.updateSettlement(ctx.roadAt(position).settlement,position);
+  ctx.frame();assert.equal(camera.zoom,undefined,'walking along an unclassified city street keeps the close zoom');
+}
+surroundings=[feature('landcover','farmland')];
+assert.equal(ctx.roadAt(street).settlement,false);
+surroundings.push(feature('landuse','residential'));
+assert.equal(ctx.roadAt(street).settlement,true);
